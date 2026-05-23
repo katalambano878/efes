@@ -1,0 +1,246 @@
+import { NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
+import { supabaseAdmin } from '@/lib/supabase-admin';
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+
+async function getAuthenticatedAdmin(request: Request) {
+  const cookieHeader = request.headers.get('cookie') || '';
+  const authToken = cookieHeader
+    .split(';')
+    .map((c) => c.trim())
+    .find((c) => c.startsWith('sb-') && c.includes('-auth-token'))
+    ?.split('=')
+    .slice(1)
+    .join('=');
+
+  if (!authToken) return null;
+
+  const decoded = decodeURIComponent(authToken);
+  let tokenData: any;
+  try {
+    tokenData = JSON.parse(decoded);
+  } catch {
+    tokenData = decoded;
+  }
+
+  const accessToken = typeof tokenData === 'string' ? tokenData : tokenData?.[0] || tokenData?.access_token;
+  if (!accessToken) return null;
+
+  const supabase = createClient(supabaseUrl, supabaseKey, {
+    global: { headers: { Authorization: `Bearer ${accessToken}` } },
+  });
+
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  const { data: profile } = await supabaseAdmin
+    .from('profiles')
+    .select('role')
+    .eq('id', user.id)
+    .single();
+
+  if (!profile || profile.role !== 'admin') return null;
+
+  return user;
+}
+
+// GET — List all staff (admin + staff role profiles)
+export async function GET(request: Request) {
+  const admin = await getAuthenticatedAdmin(request);
+  if (!admin) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  const { data: staff, error } = await supabaseAdmin
+    .from('profiles')
+    .select('id, email, full_name, phone, role, avatar_url, created_at, updated_at')
+    .in('role', ['admin', 'staff'])
+    .order('created_at', { ascending: true });
+
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  return NextResponse.json({ staff: staff || [] });
+}
+
+// POST — Invite a new staff member
+export async function POST(request: Request) {
+  const admin = await getAuthenticatedAdmin(request);
+  if (!admin) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  const body = await request.json();
+  const { email, fullName, phone, role, password } = body;
+
+  if (!email || !fullName || !role) {
+    return NextResponse.json({ error: 'Email, full name, and role are required.' }, { status: 400 });
+  }
+
+  if (!['admin', 'staff'].includes(role)) {
+    return NextResponse.json({ error: 'Role must be admin or staff.' }, { status: 400 });
+  }
+
+  if (!password || password.length < 6) {
+    return NextResponse.json({ error: 'Password must be at least 6 characters.' }, { status: 400 });
+  }
+
+  // Check if email already exists
+  const { data: existingProfile } = await supabaseAdmin
+    .from('profiles')
+    .select('id, role')
+    .eq('email', email.toLowerCase().trim())
+    .single();
+
+  if (existingProfile) {
+    if (['admin', 'staff'].includes(existingProfile.role)) {
+      return NextResponse.json({ error: 'This email is already registered as staff.' }, { status: 409 });
+    }
+    // Promote existing customer to staff
+    const { error: updateError } = await supabaseAdmin
+      .from('profiles')
+      .update({
+        role,
+        full_name: fullName,
+        phone: phone || null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', existingProfile.id);
+
+    if (updateError) {
+      return NextResponse.json({ error: updateError.message }, { status: 500 });
+    }
+
+    return NextResponse.json({
+      success: true,
+      promoted: true,
+      message: `Existing user promoted to ${role}.`,
+    });
+  }
+
+  // Create new user via Supabase Auth Admin API
+  const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
+    email: email.toLowerCase().trim(),
+    password,
+    email_confirm: true,
+    user_metadata: {
+      full_name: fullName,
+      phone: phone || '',
+    },
+  });
+
+  if (createError) {
+    if (createError.message?.includes('already been registered')) {
+      return NextResponse.json({ error: 'This email is already registered.' }, { status: 409 });
+    }
+    return NextResponse.json({ error: createError.message }, { status: 500 });
+  }
+
+  if (!newUser?.user) {
+    return NextResponse.json({ error: 'Failed to create user.' }, { status: 500 });
+  }
+
+  // The trigger handle_new_user() creates a profile with 'customer' role — update it
+  const { error: profileError } = await supabaseAdmin
+    .from('profiles')
+    .update({
+      role,
+      full_name: fullName,
+      phone: phone || null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', newUser.user.id);
+
+  if (profileError) {
+    console.error('[Staff API] Profile update error:', profileError);
+  }
+
+  return NextResponse.json({
+    success: true,
+    promoted: false,
+    userId: newUser.user.id,
+    message: `Staff member ${fullName} created successfully.`,
+  });
+}
+
+// PATCH — Update a staff member's role or details
+export async function PATCH(request: Request) {
+  const admin = await getAuthenticatedAdmin(request);
+  if (!admin) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  const body = await request.json();
+  const { userId, role, fullName, phone } = body;
+
+  if (!userId) {
+    return NextResponse.json({ error: 'User ID is required.' }, { status: 400 });
+  }
+
+  // Prevent demoting yourself
+  if (userId === admin.id && role && role !== 'admin') {
+    return NextResponse.json({ error: 'You cannot change your own role.' }, { status: 403 });
+  }
+
+  const updates: Record<string, any> = { updated_at: new Date().toISOString() };
+  if (role && ['admin', 'staff', 'customer'].includes(role)) {
+    updates.role = role;
+  }
+  if (fullName !== undefined) updates.full_name = fullName;
+  if (phone !== undefined) updates.phone = phone || null;
+
+  const { error } = await supabaseAdmin
+    .from('profiles')
+    .update(updates)
+    .eq('id', userId);
+
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  return NextResponse.json({ success: true, message: 'Staff member updated.' });
+}
+
+// DELETE — Remove staff access (demote to customer)
+export async function DELETE(request: Request) {
+  const admin = await getAuthenticatedAdmin(request);
+  if (!admin) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  const { searchParams } = new URL(request.url);
+  const userId = searchParams.get('userId');
+
+  if (!userId) {
+    return NextResponse.json({ error: 'User ID is required.' }, { status: 400 });
+  }
+
+  if (userId === admin.id) {
+    return NextResponse.json({ error: 'You cannot remove yourself.' }, { status: 403 });
+  }
+
+  // Check user exists and is staff/admin
+  const { data: profile } = await supabaseAdmin
+    .from('profiles')
+    .select('role')
+    .eq('id', userId)
+    .single();
+
+  if (!profile || !['admin', 'staff'].includes(profile.role)) {
+    return NextResponse.json({ error: 'User is not a staff member.' }, { status: 404 });
+  }
+
+  const { error } = await supabaseAdmin
+    .from('profiles')
+    .update({ role: 'customer', updated_at: new Date().toISOString() })
+    .eq('id', userId);
+
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  return NextResponse.json({ success: true, message: 'Staff access removed.' });
+}
