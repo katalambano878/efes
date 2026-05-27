@@ -51,6 +51,8 @@ export default function CMSPage() {
   const [tableReady, setTableReady] = useState(true);
   /** Which hero slide index is currently uploading an image (null = none). */
   const [uploadingHeroSlide, setUploadingHeroSlide] = useState<number | null>(null);
+  /** Which hero slide index is currently uploading a video (null = none). */
+  const [uploadingHeroSlideVideo, setUploadingHeroSlideVideo] = useState<number | null>(null);
 
   useEffect(() => {
     fetchSettings();
@@ -159,6 +161,52 @@ export default function CMSPage() {
       alert(message);
     } finally {
       setUploadingHeroSlide(null);
+    }
+  };
+
+  const handleHeroSlideVideoUpload = async (slideIndex: number, e: React.ChangeEvent<HTMLInputElement>) => {
+    const input = e.target;
+    const file = input.files?.[0];
+    input.value = '';
+    if (!file) return;
+
+    if (!file.type.startsWith('video/')) {
+      alert('Please choose a video file (MP4, WebM, MOV).');
+      return;
+    }
+    const maxBytes = 50 * 1024 * 1024;
+    if (file.size > maxBytes) {
+      alert('Video is too large. Maximum size is 50 MB. Tip: keep hero videos short and compressed for fast loading.');
+      return;
+    }
+
+    setUploadingHeroSlideVideo(slideIndex);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('bucket', 'products');
+
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch('/api/admin/upload', {
+        method: 'POST',
+        credentials: 'include',
+        headers: session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {},
+        body: formData,
+      });
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data?.error || res.statusText || 'Upload failed');
+      }
+      const url = data?.url as string | undefined;
+      if (!url) throw new Error('No video URL returned');
+
+      updateHeroSlide(slideIndex, 'video', url);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Upload failed';
+      alert(message);
+    } finally {
+      setUploadingHeroSlideVideo(null);
     }
   };
 
@@ -612,16 +660,34 @@ CREATE POLICY "Allow authenticated write" ON site_settings
                   <div className="p-6 grid lg:grid-cols-2 gap-6">
                     <div>
                       <div className="relative aspect-video rounded-lg overflow-hidden bg-gray-100 border border-gray-200">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={slide.image || '/placeholder.svg'}
-                          alt=""
-                          className="w-full h-full object-cover"
-                          onError={(e) => {
-                            (e.target as HTMLImageElement).src =
-                              'https://via.placeholder.com/800x450?text=Image';
-                          }}
-                        />
+                        {slide.video ? (
+                          <video
+                            key={slide.video}
+                            src={slide.video}
+                            poster={slide.image || undefined}
+                            className="w-full h-full object-cover"
+                            autoPlay
+                            muted
+                            loop
+                            playsInline
+                          />
+                        ) : (
+                          /* eslint-disable-next-line @next/next/no-img-element */
+                          <img
+                            src={slide.image || '/placeholder.svg'}
+                            alt=""
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).src =
+                                'https://via.placeholder.com/800x450?text=Image';
+                            }}
+                          />
+                        )}
+                        {slide.video && (
+                          <span className="absolute top-2 left-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-black/70 text-white text-[10px] font-bold uppercase tracking-wider">
+                            <i className="ri-vidicon-line" /> Video
+                          </span>
+                        )}
                         <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-3">
                           <p className="text-[10px] text-white/80 uppercase tracking-widest truncate">
                             {slide.tagline || 'Tagline'}
@@ -672,6 +738,60 @@ CREATE POLICY "Allow authenticated write" ON site_settings
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono"
                           placeholder="Filled after upload, or paste URL / /hero0.png"
                         />
+                      </FieldGroup>
+                      <FieldGroup
+                        label="Slide video (optional)"
+                        description="Upload a short, muted background video (MP4 / WebM / MOV, max 50 MB). When set, it plays in place of the photo above. The photo is still used as a poster while the video loads."
+                      >
+                        <div className="flex flex-wrap items-center gap-2 mb-2">
+                          <input
+                            id={`hero-slide-video-${i}`}
+                            type="file"
+                            accept="video/mp4,video/webm,video/quicktime,video/*"
+                            className="hidden"
+                            disabled={uploadingHeroSlideVideo === i}
+                            onChange={(e) => handleHeroSlideVideoUpload(i, e)}
+                          />
+                          <label
+                            htmlFor={`hero-slide-video-${i}`}
+                            className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium border cursor-pointer transition-colors ${
+                              uploadingHeroSlideVideo === i
+                                ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-wait'
+                                : 'bg-white text-gray-900 border-gray-300 hover:bg-gray-50'
+                            }`}
+                          >
+                            {uploadingHeroSlideVideo === i ? (
+                              <>
+                                <i className="ri-loader-4-line animate-spin" />
+                                Uploading…
+                              </>
+                            ) : (
+                              <>
+                                <i className="ri-vidicon-line" />
+                                {slide.video ? 'Replace video' : 'Choose video'}
+                              </>
+                            )}
+                          </label>
+                          {slide.video && (
+                            <button
+                              type="button"
+                              onClick={() => updateHeroSlide(i, 'video', '')}
+                              className="text-sm font-medium text-red-600 hover:underline"
+                            >
+                              Remove video
+                            </button>
+                          )}
+                        </div>
+                        <input
+                          type="text"
+                          value={slide.video || ''}
+                          onChange={(e) => updateHeroSlide(i, 'video', e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono"
+                          placeholder="Filled after upload, or paste a video URL (e.g. /hero.mp4)"
+                        />
+                        <p className="text-xs text-gray-500 mt-1">
+                          Videos autoplay muted on loop. Keep them under ~10 seconds and compressed for fast loading on mobile.
+                        </p>
                       </FieldGroup>
                       <FieldGroup label="Tagline (small caps line)">
                         <input

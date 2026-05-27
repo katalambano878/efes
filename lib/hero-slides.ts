@@ -1,5 +1,12 @@
 export type HeroSlide = {
   image: string;
+  /**
+   * Optional background video URL (mp4/webm/mov). When set, the storefront
+   * renders an autoplaying, muted, looping video instead of the still image.
+   * The `image` field is still used as the poster while the video loads
+   * and as a fallback if the browser can't play it.
+   */
+  video?: string;
   tagline: string;
   headline: string;
   subheadline: string;
@@ -60,8 +67,10 @@ export const DEFAULT_HERO_BANNER_CONFIG: HeroBannerConfig = {
 function isHeroSlide(x: unknown): x is HeroSlide {
   if (!x || typeof x !== 'object') return false;
   const o = x as Record<string, unknown>;
+  const videoOk = o.video === undefined || typeof o.video === 'string';
   return (
     typeof o.image === 'string' &&
+    videoOk &&
     typeof o.tagline === 'string' &&
     typeof o.headline === 'string' &&
     typeof o.subheadline === 'string' &&
@@ -105,6 +114,7 @@ export function parseHeroBannerConfig(raw: string | null | undefined): HeroBanne
 export function emptyHeroSlide(): HeroSlide {
   return {
     image: '/hero0.png',
+    video: '',
     tagline: '',
     headline: '',
     subheadline: '',

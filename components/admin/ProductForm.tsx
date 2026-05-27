@@ -98,11 +98,6 @@ export default function ProductForm({ initialData, isEditMode = false }: Product
             sizes: ['Free Size', 'One Size'],
         },
         {
-            label: 'Volume (ml)',
-            hint: 'Perfumes, oils, fragrances.',
-            sizes: ['10ml', '20ml', '30ml', '50ml', '100ml', '150ml', '200ml'],
-        },
-        {
             label: 'Length',
             hint: 'Lashes, wigs, hair bundles.',
             sizes: ['12mm', '14mm', '16mm', '18mm', '20mm', '14"', '16"', '18"', '20"', '22"', '24"'],

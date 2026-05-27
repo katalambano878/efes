@@ -145,29 +145,50 @@ export default function Home() {
         
         {/* Cinematic Background Images with Ken Burns Effect */}
         <div className="absolute inset-0 z-0">
-          {slides.map((slide, index) => (
-            <div 
-              key={`hero-slide-${index}-${slide.image}`}
-              className={`absolute inset-0 transition-opacity duration-[1500ms] ease-in-out ${
-                index === activeHeroIndex ? 'opacity-100 z-10' : 'opacity-0 z-0'
-              }`}
-            >
-              <Image
-                src={(slide.image && slide.image.trim()) || '/hero0.png'}
-                fill
-                className={`object-cover transform transition-transform duration-[10000ms] ease-out ${
-                  index === activeHeroIndex ? 'scale-105' : 'scale-100'
+          {slides.map((slide, index) => {
+            const hasVideo = !!(slide.video && slide.video.trim());
+            const posterSrc = (slide.image && slide.image.trim()) || '/hero0.png';
+            const isActive = index === activeHeroIndex;
+            return (
+              <div
+                key={`hero-slide-${index}-${slide.video || slide.image}`}
+                className={`absolute inset-0 transition-opacity duration-[1500ms] ease-in-out ${
+                  isActive ? 'opacity-100 z-10' : 'opacity-0 z-0'
                 }`}
-                alt={`Hero Background ${index + 1}`}
-                priority={index === 0}
-                sizes="100vw"
-                quality={90}
-              />
-              {/* Subtle Vignette & Gradient Overlay */}
-              <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-transparent to-black/80 mix-blend-multiply"></div>
-              <div className="absolute inset-0 bg-gradient-to-r from-black/60 via-black/20 to-transparent"></div>
-            </div>
-          ))}
+              >
+                {hasVideo ? (
+                  <video
+                    key={slide.video}
+                    src={slide.video}
+                    poster={posterSrc}
+                    className={`absolute inset-0 w-full h-full object-cover transform transition-transform duration-[10000ms] ease-out ${
+                      isActive ? 'scale-105' : 'scale-100'
+                    }`}
+                    autoPlay
+                    muted
+                    loop
+                    playsInline
+                    preload={isActive ? 'auto' : 'metadata'}
+                  />
+                ) : (
+                  <Image
+                    src={posterSrc}
+                    fill
+                    className={`object-cover transform transition-transform duration-[10000ms] ease-out ${
+                      isActive ? 'scale-105' : 'scale-100'
+                    }`}
+                    alt={`Hero Background ${index + 1}`}
+                    priority={index === 0}
+                    sizes="100vw"
+                    quality={90}
+                  />
+                )}
+                {/* Subtle Vignette & Gradient Overlay */}
+                <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-transparent to-black/80 mix-blend-multiply"></div>
+                <div className="absolute inset-0 bg-gradient-to-r from-black/60 via-black/20 to-transparent"></div>
+              </div>
+            );
+          })}
         </div>
 
         {/* Elegant Content Layout */}
