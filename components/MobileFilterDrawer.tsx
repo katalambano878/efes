@@ -15,7 +15,12 @@ export default function MobileFilterDrawer({ isOpen, onClose }: MobileFilterDraw
   const [selectedRating, setSelectedRating] = useState<number | null>(null);
 
   const categories = ['Dresses', 'Tops', 'Bottoms', 'Shoes', 'Bags', 'Accessories'];
-  const sizes = ['XS', 'S', 'M', 'L', 'XL', 'XXL'];
+  const sizes = [
+    'UK 8', 'UK 10', 'UK 12', 'UK 14', 'UK 16', 'UK 18',
+    'UK 20', 'UK 22', 'UK 24', 'UK 26',
+    'Free Size',
+    'XS', 'S', 'M', 'L', 'XL', 'XXL',
+  ];
   const colors = [
     { name: 'Black', hex: '#000000' },
     { name: 'White', hex: '#FFFFFF' },

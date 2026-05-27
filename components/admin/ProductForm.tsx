@@ -67,8 +67,47 @@ export default function ProductForm({ initialData, isEditMode = false }: Product
         { name: 'Gold', hex: '#D4AF37' },
         { name: 'Silver', hex: '#C0C0C0' },
     ];
-    // Common product sizes & options (you can add custom ones)
-    const sizePresets = ['10ml', '20ml', '30ml', '50ml', '100ml', '150ml', '200ml'];
+    /**
+     * Grouped size presets so admins can pick the right scale per product:
+     * - Clothes/dresses → UK 8–18 (+ plus sizes 20–30)
+     * - Generic apparel → XS–XXXL
+     * - Free / one-size items → "Free Size" / "One Size"
+     * - Perfumes / oils → ml
+     * - Lashes / wigs → mm / inches
+     * Use the custom input below for anything bespoke.
+     */
+    const sizePresetGroups: { label: string; sizes: string[]; hint?: string }[] = [
+        {
+            label: 'UK Clothing Sizes',
+            hint: 'Standard UK dress sizes — best for women\u2019s wear, tops, bottoms.',
+            sizes: ['UK 8', 'UK 10', 'UK 12', 'UK 14', 'UK 16', 'UK 18'],
+        },
+        {
+            label: 'Plus Sizes (UK)',
+            hint: 'Extended UK range for plus / curve items.',
+            sizes: ['UK 20', 'UK 22', 'UK 24', 'UK 26', 'UK 28', 'UK 30'],
+        },
+        {
+            label: 'Letter Sizes',
+            hint: 'XS\u2013XXXL — useful for unisex pieces or international fits.',
+            sizes: ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL'],
+        },
+        {
+            label: 'Free / One Size',
+            hint: 'For items that fit most without size variants.',
+            sizes: ['Free Size', 'One Size'],
+        },
+        {
+            label: 'Volume (ml)',
+            hint: 'Perfumes, oils, fragrances.',
+            sizes: ['10ml', '20ml', '30ml', '50ml', '100ml', '150ml', '200ml'],
+        },
+        {
+            label: 'Length',
+            hint: 'Lashes, wigs, hair bundles.',
+            sizes: ['12mm', '14mm', '16mm', '18mm', '20mm', '14"', '16"', '18"', '20"', '22"', '24"'],
+        },
+    ];
 
     // Parse existing variants to extract unique colors, sizes, and variant image
     const existingVariants = (initialData?.product_variants || []).map((v: any) => ({
@@ -244,10 +283,21 @@ export default function ProductForm({ initialData, isEditMode = false }: Product
     const [uploadProgress, setUploadProgress] = useState<{ name: string; done: boolean }[]>([]);
 
     // SEO
+    const initialSeoMeta = (initialData?.metadata?.seo && typeof initialData.metadata.seo === 'object')
+        ? initialData.metadata.seo
+        : {};
     const [seoTitle, setSeoTitle] = useState(initialData?.seo_title || '');
     const [metaDescription, setMetaDescription] = useState(initialData?.seo_description || '');
     const [urlSlug, setUrlSlug] = useState(initialData?.slug || '');
     const [keywords, setKeywords] = useState(initialData?.tags?.join(', ') || '');
+    const [focusKeyword, setFocusKeyword] = useState<string>(initialSeoMeta.focus_keyword || '');
+    const [ogTitle, setOgTitle] = useState<string>(initialSeoMeta.og_title || '');
+    const [ogDescription, setOgDescription] = useState<string>(initialSeoMeta.og_description || '');
+    const [ogImage, setOgImage] = useState<string>(initialSeoMeta.og_image || '');
+    const [robotsIndex, setRobotsIndex] = useState<boolean>(
+        initialSeoMeta.robots_index === undefined ? true : !!initialSeoMeta.robots_index
+    );
+    const [ogImageUploading, setOgImageUploading] = useState(false);
     // Track manual edits so auto-generation doesn't overwrite user changes
     const [seoTitleEdited, setSeoTitleEdited] = useState(!!initialData?.seo_title);
     const [metaDescEdited, setMetaDescEdited] = useState(!!initialData?.seo_description);
@@ -476,7 +526,14 @@ export default function ProductForm({ initialData, isEditMode = false }: Product
                     availability_type: availabilityType,
                     preorder_shipping: availabilityType === 'preorder' ? (preorderShipping.trim() || null) : null,
                     wholesale_price: wholesalePrice ? parseFloat(wholesalePrice) : null,
-                    wholesale_min_qty: wholesaleMinQty ? parseInt(wholesaleMinQty) : null
+                    wholesale_min_qty: wholesaleMinQty ? parseInt(wholesaleMinQty) : null,
+                    seo: {
+                        focus_keyword: focusKeyword.trim() || null,
+                        og_title: ogTitle.trim() || null,
+                        og_description: ogDescription.trim() || null,
+                        og_image: ogImage.trim() || null,
+                        robots_index: robotsIndex,
+                    },
                 },
                 variants: variantsPayload,
             };
@@ -1064,28 +1121,43 @@ export default function ProductForm({ initialData, isEditMode = false }: Product
                                     )}
                                 </h4>
                                 <p className="text-xs text-gray-500 mb-4">
-                                    Click options to add/remove. Use custom for things like volumes (10ml, 50ml),
-                                    lash lengths (12mm, 16mm), wig lengths (14&quot;, 20&quot;), bundle counts, etc.
+                                    Pick from any group below. Mix groups freely (e.g. UK 8\u201318 + a custom &ldquo;One Size&rdquo;).
+                                    Sizes are saved per product and shown to customers in the order you add them.
                                 </p>
 
-                                <div className="flex flex-wrap gap-2 mb-4">
-                                    {sizePresets.map(size => {
-                                        const isSelected = selectedSizes.includes(size);
-                                        return (
-                                            <button
-                                                key={size}
-                                                onClick={() => toggleSize(size)}
-                                                className={`px-5 py-2.5 rounded-lg border-2 font-semibold text-sm transition-all ${
-                                                    isSelected
-                                                        ? 'border-blue-600 bg-blue-50 text-blue-800 ring-1 ring-blue-600'
-                                                        : 'border-gray-200 hover:border-gray-300 bg-white text-gray-700'
-                                                }`}
-                                            >
-                                                {size}
-                                                {isSelected && <i className="ri-check-line ml-1.5 text-blue-600"></i>}
-                                            </button>
-                                        );
-                                    })}
+                                <div className="space-y-4 mb-4">
+                                    {sizePresetGroups.map(group => (
+                                        <div key={group.label}>
+                                            <div className="flex items-center justify-between mb-2">
+                                                <p className="text-xs font-bold uppercase tracking-wider text-gray-600">
+                                                    {group.label}
+                                                </p>
+                                                {group.hint && (
+                                                    <p className="text-[10px] text-gray-400 italic">{group.hint}</p>
+                                                )}
+                                            </div>
+                                            <div className="flex flex-wrap gap-2">
+                                                {group.sizes.map(size => {
+                                                    const isSelected = selectedSizes.includes(size);
+                                                    return (
+                                                        <button
+                                                            key={size}
+                                                            type="button"
+                                                            onClick={() => toggleSize(size)}
+                                                            className={`px-4 py-2 rounded-lg border-2 font-semibold text-sm transition-all ${
+                                                                isSelected
+                                                                    ? 'border-blue-600 bg-blue-50 text-blue-800 ring-1 ring-blue-600'
+                                                                    : 'border-gray-200 hover:border-gray-300 bg-white text-gray-700'
+                                                            }`}
+                                                        >
+                                                            {size}
+                                                            {isSelected && <i className="ri-check-line ml-1.5 text-blue-600"></i>}
+                                                        </button>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                    ))}
                                 </div>
 
                                 {/* Custom size */}
@@ -1431,12 +1503,102 @@ export default function ProductForm({ initialData, isEditMode = false }: Product
                         </div>
                     )}
 
-                    {activeTab === 'seo' && (
-                        <div className="space-y-6 max-w-3xl">
+                    {activeTab === 'seo' && (() => {
+                        // ---- Live SEO analysis (computed each render) ----
+                        const siteHost = (process.env.NEXT_PUBLIC_APP_URL || 'https://efescloset.com')
+                            .replace(/^https?:\/\//, '')
+                            .replace(/\/+$/, '');
+                        const siteName = process.env.NEXT_PUBLIC_SITE_NAME || 'Efescloset';
+                        const firstImage = images.find((img: any) => img.media_type !== 'video');
+                        const effectiveOgImage = ogImage || firstImage?.url || '';
+                        const effectiveOgTitle = ogTitle || seoTitle || productName;
+                        const effectiveOgDesc = ogDescription || metaDescription;
+                        const fk = focusKeyword.trim().toLowerCase();
+                        const plainDesc = (description || '').replace(/<[^>]*>/g, '').toLowerCase();
+
+                        const checks = [
+                            {
+                                id: 'title-length',
+                                label: 'Page title is 30\u201360 characters',
+                                pass: seoTitle.length >= 30 && seoTitle.length <= 60,
+                                hint: seoTitle.length === 0
+                                    ? 'Add a page title.'
+                                    : seoTitle.length < 30
+                                        ? 'Title is short \u2014 aim for 30\u201360 characters.'
+                                        : seoTitle.length > 60
+                                            ? 'Title is too long \u2014 Google may truncate it.'
+                                            : '',
+                            },
+                            {
+                                id: 'desc-length',
+                                label: 'Meta description is 120\u2013160 characters',
+                                pass: metaDescription.length >= 120 && metaDescription.length <= 160,
+                                hint: metaDescription.length === 0
+                                    ? 'Add a meta description.'
+                                    : metaDescription.length < 120
+                                        ? 'Description is short \u2014 use 120\u2013160 characters for best results.'
+                                        : metaDescription.length > 160
+                                            ? 'Description is too long \u2014 Google may cut it off.'
+                                            : '',
+                            },
+                            {
+                                id: 'slug-clean',
+                                label: 'URL slug is set and clean',
+                                pass: !!urlSlug && /^[a-z0-9-]+$/.test(urlSlug) && urlSlug.length <= 75,
+                                hint: !urlSlug ? 'Set a URL slug.' : urlSlug.length > 75 ? 'Slug is long \u2014 shorter is better.' : '',
+                            },
+                            {
+                                id: 'image',
+                                label: 'Has at least one product image',
+                                pass: images.filter((img: any) => img.media_type !== 'video').length > 0,
+                                hint: 'Upload a product image so social previews look great.',
+                            },
+                            {
+                                id: 'focus-kw',
+                                label: 'Focus keyword is set',
+                                pass: fk.length > 0,
+                                hint: 'Pick the main phrase customers would search for.',
+                            },
+                            {
+                                id: 'kw-in-title',
+                                label: 'Focus keyword appears in the page title',
+                                pass: !!fk && seoTitle.toLowerCase().includes(fk),
+                                hint: fk ? `Include "${fk}" in the page title.` : 'Set a focus keyword first.',
+                            },
+                            {
+                                id: 'kw-in-desc',
+                                label: 'Focus keyword appears in the meta description',
+                                pass: !!fk && metaDescription.toLowerCase().includes(fk),
+                                hint: fk ? `Mention "${fk}" in the meta description.` : '',
+                            },
+                            {
+                                id: 'kw-in-slug',
+                                label: 'Focus keyword appears in the URL',
+                                pass: !!fk && urlSlug.toLowerCase().includes(fk.replace(/\s+/g, '-')),
+                                hint: fk ? `Add "${fk.replace(/\s+/g, '-')}" to the slug.` : '',
+                            },
+                            {
+                                id: 'kw-in-body',
+                                label: 'Focus keyword appears in the product description',
+                                pass: !!fk && plainDesc.includes(fk),
+                                hint: fk ? `Mention "${fk}" naturally in the description.` : '',
+                            },
+                        ];
+                        const passed = checks.filter(c => c.pass).length;
+                        const score = Math.round((passed / checks.length) * 100);
+                        const scoreColor = score >= 80
+                            ? 'text-emerald-700 bg-emerald-100 border-emerald-200'
+                            : score >= 50
+                                ? 'text-amber-700 bg-amber-100 border-amber-200'
+                                : 'text-red-700 bg-red-100 border-red-200';
+                        const scoreLabel = score >= 80 ? 'Great' : score >= 50 ? 'Needs work' : 'Poor';
+
+                        return (
+                        <div className="space-y-6 max-w-4xl">
                             <div className="flex items-start justify-between gap-4">
                                 <div>
                                     <h3 className="text-lg font-bold text-gray-900 mb-1">Search Engine Optimization</h3>
-                                    <p className="text-gray-600 text-sm">Auto-generated from your product name and description. You can edit any field manually.</p>
+                                    <p className="text-gray-600 text-sm">Optimise how this product appears on Google, Facebook, Instagram, WhatsApp and X.</p>
                                 </div>
                                 <button
                                     type="button"
@@ -1457,82 +1619,307 @@ export default function ProductForm({ initialData, isEditMode = false }: Product
                                 </button>
                             </div>
 
-                            {/* Google preview */}
-                            {(seoTitle || metaDescription) && (
-                                <div className="p-4 bg-white border-2 border-gray-100 rounded-xl">
-                                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Google Preview</p>
-                                    <p className="text-blue-700 text-base font-medium leading-snug truncate">{seoTitle || productName}</p>
-                                    <p className="text-green-700 text-xs mt-0.5">yoursite.com/product/{urlSlug}</p>
-                                    <p className="text-gray-600 text-sm mt-1 line-clamp-2">{metaDescription}</p>
+                            {/* SEO Score + Checklist */}
+                            <div className="bg-gradient-to-br from-gray-50 to-white border-2 border-gray-200 rounded-xl p-5">
+                                <div className="flex items-center justify-between mb-4">
+                                    <div>
+                                        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">SEO Score</p>
+                                        <p className="text-3xl font-extrabold text-gray-900 mt-0.5">{score}<span className="text-base font-semibold text-gray-500">/100</span></p>
+                                    </div>
+                                    <span className={`text-xs font-bold px-3 py-1.5 rounded-full border ${scoreColor}`}>{scoreLabel}</span>
                                 </div>
-                            )}
-
-                            <div>
-                                <div className="flex items-center justify-between mb-2">
-                                    <label className="text-sm font-semibold text-gray-900">Page Title</label>
-                                    <span className={`text-xs font-medium ${seoTitle.length > 60 ? 'text-red-500' : seoTitle.length > 50 ? 'text-amber-500' : 'text-gray-400'}`}>
-                                        {seoTitle.length}/60
-                                    </span>
-                                </div>
-                                <input
-                                    type="text"
-                                    value={seoTitle}
-                                    onChange={(e) => { setSeoTitle(e.target.value); setSeoTitleEdited(true); }}
-                                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-600 focus:border-gray-600"
-                                    placeholder="e.g. Product Name | My Store"
-                                />
-                            </div>
-
-                            <div>
-                                <div className="flex items-center justify-between mb-2">
-                                    <label className="text-sm font-semibold text-gray-900">Meta Description</label>
-                                    <span className={`text-xs font-medium ${metaDescription.length > 160 ? 'text-red-500' : metaDescription.length > 140 ? 'text-amber-500' : 'text-gray-400'}`}>
-                                        {metaDescription.length}/160
-                                    </span>
-                                </div>
-                                <textarea
-                                    rows={3}
-                                    value={metaDescription}
-                                    onChange={(e) => { setMetaDescription(e.target.value); setMetaDescEdited(true); }}
-                                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-600 focus:border-gray-600 resize-none"
-                                    placeholder="e.g. Shop this product at our store. Fast delivery."
-                                />
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-semibold text-gray-900 mb-2">
-                                    URL Slug
-                                </label>
-                                <div className="flex items-center">
-                                    <span className="text-gray-600 bg-gray-100 px-4 py-3 border-2 border-r-0 border-gray-300 rounded-l-lg whitespace-nowrap text-sm">
-                                        /product/
-                                    </span>
-                                    <input
-                                        type="text"
-                                        value={urlSlug}
-                                        onChange={(e) => setUrlSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/(^-|-$)+/g, ''))}
-                                        className="flex-1 px-4 py-3 border-2 border-gray-300 rounded-r-lg focus:ring-2 focus:ring-gray-600 focus:border-gray-600"
-                                        placeholder="product-slug"
+                                <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
+                                    <div
+                                        className={`h-full transition-all ${score >= 80 ? 'bg-emerald-500' : score >= 50 ? 'bg-amber-500' : 'bg-red-500'}`}
+                                        style={{ width: `${score}%` }}
                                     />
                                 </div>
-                                <p className="text-xs text-gray-400 mt-1">Only lowercase letters, numbers and hyphens. Auto-sanitised as you type.</p>
+                                <ul className="mt-4 space-y-2">
+                                    {checks.map(c => (
+                                        <li key={c.id} className="flex items-start gap-2 text-sm">
+                                            <i className={`mt-0.5 ${c.pass ? 'ri-checkbox-circle-fill text-emerald-500' : 'ri-error-warning-fill text-amber-500'}`}></i>
+                                            <div className="flex-1">
+                                                <span className={c.pass ? 'text-gray-700' : 'text-gray-900 font-medium'}>{c.label}</span>
+                                                {!c.pass && c.hint && (
+                                                    <p className="text-xs text-gray-500 mt-0.5">{c.hint}</p>
+                                                )}
+                                            </div>
+                                        </li>
+                                    ))}
+                                </ul>
                             </div>
 
+                            {/* Focus keyword */}
                             <div>
                                 <label className="block text-sm font-semibold text-gray-900 mb-2">
-                                    Keywords
+                                    Focus keyword
                                 </label>
                                 <input
                                     type="text"
-                                    value={keywords}
-                                    onChange={(e) => { setKeywords(e.target.value); setKeywordsEdited(true); }}
+                                    value={focusKeyword}
+                                    onChange={(e) => setFocusKeyword(e.target.value)}
                                     className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-600 focus:border-gray-600"
-                                    placeholder="e.g. product name, category"
+                                    placeholder='e.g. "ankara dress" or "lash extensions"'
                                 />
-                                <p className="text-xs text-gray-400 mt-1">Separate with commas. Auto-generated from product name.</p>
+                                <p className="text-xs text-gray-400 mt-1">
+                                    The main phrase customers would search for. The checklist above scores whether it appears in your title, description, slug and body.
+                                </p>
+                            </div>
+
+                            {/* Live previews */}
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                                {/* Google preview */}
+                                <div className="p-4 bg-white border-2 border-gray-200 rounded-xl">
+                                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                                        <i className="ri-google-fill text-blue-500"></i> Google
+                                    </p>
+                                    <p className="text-xs text-gray-600">{siteName}</p>
+                                    <p className="text-[11px] text-gray-500 mt-0.5">{siteHost} &rsaquo; product &rsaquo; {urlSlug || 'product-slug'}</p>
+                                    <p className="text-blue-700 text-lg font-medium leading-snug mt-1 line-clamp-2">{seoTitle || productName || 'Your product title'}</p>
+                                    <p className="text-gray-600 text-sm mt-1 line-clamp-3">{metaDescription || 'Your meta description will appear here.'}</p>
+                                </div>
+
+                                {/* Facebook / WhatsApp preview */}
+                                <div className="p-4 bg-white border-2 border-gray-200 rounded-xl">
+                                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                                        <i className="ri-facebook-circle-fill text-[#1877F2]"></i> Facebook / WhatsApp
+                                    </p>
+                                    <div className="border border-gray-200 rounded-lg overflow-hidden">
+                                        {effectiveOgImage ? (
+                                            <img src={effectiveOgImage} alt="" className="w-full h-44 object-cover bg-gray-100" />
+                                        ) : (
+                                            <div className="w-full h-44 bg-gray-100 flex items-center justify-center text-gray-400 text-xs">No image</div>
+                                        )}
+                                        <div className="p-3 bg-gray-50">
+                                            <p className="text-[10px] uppercase text-gray-500">{siteHost}</p>
+                                            <p className="text-sm font-semibold text-gray-900 line-clamp-1 mt-0.5">{effectiveOgTitle || 'Your product title'}</p>
+                                            <p className="text-xs text-gray-600 line-clamp-2 mt-0.5">{effectiveOgDesc || 'Your social description will appear here.'}</p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* X / Twitter preview */}
+                                <div className="p-4 bg-white border-2 border-gray-200 rounded-xl">
+                                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                                        <i className="ri-twitter-x-fill text-black"></i> X (Twitter)
+                                    </p>
+                                    <div className="border border-gray-200 rounded-2xl overflow-hidden">
+                                        {effectiveOgImage ? (
+                                            <img src={effectiveOgImage} alt="" className="w-full h-44 object-cover bg-gray-100" />
+                                        ) : (
+                                            <div className="w-full h-44 bg-gray-100 flex items-center justify-center text-gray-400 text-xs">No image</div>
+                                        )}
+                                        <div className="p-3">
+                                            <p className="text-[10px] uppercase text-gray-500">{siteHost}</p>
+                                            <p className="text-sm font-semibold text-gray-900 line-clamp-1 mt-0.5">{effectiveOgTitle || 'Your product title'}</p>
+                                            <p className="text-xs text-gray-600 line-clamp-2 mt-0.5">{effectiveOgDesc || 'Your social description will appear here.'}</p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Instagram-style preview (mobile share card) */}
+                                <div className="p-4 bg-white border-2 border-gray-200 rounded-xl">
+                                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                                        <i className="ri-instagram-line text-pink-500"></i> Instagram / iMessage share
+                                    </p>
+                                    <div className="border border-gray-200 rounded-xl overflow-hidden flex gap-3 p-2">
+                                        {effectiveOgImage ? (
+                                            <img src={effectiveOgImage} alt="" className="w-20 h-20 object-cover rounded-lg bg-gray-100 flex-shrink-0" />
+                                        ) : (
+                                            <div className="w-20 h-20 bg-gray-100 rounded-lg flex items-center justify-center text-gray-400 text-[10px] flex-shrink-0">No image</div>
+                                        )}
+                                        <div className="min-w-0 flex-1">
+                                            <p className="text-sm font-semibold text-gray-900 line-clamp-2">{effectiveOgTitle || 'Your product title'}</p>
+                                            <p className="text-xs text-gray-600 line-clamp-2 mt-0.5">{effectiveOgDesc || 'Your social description will appear here.'}</p>
+                                            <p className="text-[10px] text-gray-400 mt-1">{siteHost}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Basics */}
+                            <div className="space-y-5 pt-2">
+                                <h4 className="text-sm font-bold text-gray-900 uppercase tracking-wider">Basics</h4>
+
+                                <div>
+                                    <div className="flex items-center justify-between mb-2">
+                                        <label className="text-sm font-semibold text-gray-900">Page title</label>
+                                        <span className={`text-xs font-medium ${seoTitle.length > 60 ? 'text-red-500' : seoTitle.length > 50 ? 'text-amber-500' : 'text-gray-400'}`}>
+                                            {seoTitle.length}/60
+                                        </span>
+                                    </div>
+                                    <input
+                                        type="text"
+                                        value={seoTitle}
+                                        onChange={(e) => { setSeoTitle(e.target.value); setSeoTitleEdited(true); }}
+                                        className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-600 focus:border-gray-600"
+                                        placeholder={`e.g. ${productName || 'Product name'} | ${siteName}`}
+                                    />
+                                </div>
+
+                                <div>
+                                    <div className="flex items-center justify-between mb-2">
+                                        <label className="text-sm font-semibold text-gray-900">Meta description</label>
+                                        <span className={`text-xs font-medium ${metaDescription.length > 160 ? 'text-red-500' : metaDescription.length > 140 ? 'text-amber-500' : 'text-gray-400'}`}>
+                                            {metaDescription.length}/160
+                                        </span>
+                                    </div>
+                                    <textarea
+                                        rows={3}
+                                        value={metaDescription}
+                                        onChange={(e) => { setMetaDescription(e.target.value); setMetaDescEdited(true); }}
+                                        className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-600 focus:border-gray-600 resize-none"
+                                        placeholder={`Shop ${productName || 'this product'} at ${siteName}. Fast delivery in Ghana.`}
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-semibold text-gray-900 mb-2">URL slug</label>
+                                    <div className="flex items-center">
+                                        <span className="text-gray-600 bg-gray-100 px-4 py-3 border-2 border-r-0 border-gray-300 rounded-l-lg whitespace-nowrap text-sm">
+                                            {siteHost}/product/
+                                        </span>
+                                        <input
+                                            type="text"
+                                            value={urlSlug}
+                                            onChange={(e) => setUrlSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/(^-|-$)+/g, ''))}
+                                            className="flex-1 px-4 py-3 border-2 border-gray-300 rounded-r-lg focus:ring-2 focus:ring-gray-600 focus:border-gray-600"
+                                            placeholder="product-slug"
+                                        />
+                                    </div>
+                                    <p className="text-xs text-gray-400 mt-1">Only lowercase letters, numbers and hyphens.</p>
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-semibold text-gray-900 mb-2">Keywords</label>
+                                    <input
+                                        type="text"
+                                        value={keywords}
+                                        onChange={(e) => { setKeywords(e.target.value); setKeywordsEdited(true); }}
+                                        className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-600 focus:border-gray-600"
+                                        placeholder="e.g. ankara dress, occasion wear, ghana fashion"
+                                    />
+                                    <p className="text-xs text-gray-400 mt-1">Separate with commas. Saved as product tags too.</p>
+                                </div>
+                            </div>
+
+                            {/* Social sharing */}
+                            <div className="space-y-5 pt-4 border-t border-gray-200">
+                                <div>
+                                    <h4 className="text-sm font-bold text-gray-900 uppercase tracking-wider">Social sharing (Open Graph)</h4>
+                                    <p className="text-xs text-gray-500 mt-1">Override what appears when this product is shared on Facebook, WhatsApp, Instagram and X. Leave blank to use the basics above.</p>
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-semibold text-gray-900 mb-2">Social title</label>
+                                    <input
+                                        type="text"
+                                        value={ogTitle}
+                                        onChange={(e) => setOgTitle(e.target.value)}
+                                        className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-600 focus:border-gray-600"
+                                        placeholder="Falls back to the page title above"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-semibold text-gray-900 mb-2">Social description</label>
+                                    <textarea
+                                        rows={2}
+                                        value={ogDescription}
+                                        onChange={(e) => setOgDescription(e.target.value)}
+                                        className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-600 focus:border-gray-600 resize-none"
+                                        placeholder="Falls back to the meta description above"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-semibold text-gray-900 mb-2">Social image</label>
+                                    <div className="flex items-start gap-4">
+                                        <div className="w-32 h-32 rounded-lg overflow-hidden border-2 border-gray-200 bg-gray-100 flex-shrink-0">
+                                            {effectiveOgImage ? (
+                                                <img src={effectiveOgImage} alt="" className="w-full h-full object-cover" />
+                                            ) : (
+                                                <div className="w-full h-full flex items-center justify-center text-gray-400 text-[10px] text-center px-2">
+                                                    No image yet
+                                                </div>
+                                            )}
+                                        </div>
+                                        <div className="flex-1 space-y-2">
+                                            <div className="flex flex-wrap items-center gap-2">
+                                                <label className="cursor-pointer inline-flex items-center gap-2 px-4 py-2 border-2 border-gray-300 rounded-lg text-sm font-semibold text-gray-700 hover:border-gray-900 hover:bg-gray-50 transition-colors">
+                                                    <i className="ri-upload-line"></i>
+                                                    {ogImageUploading ? 'Uploading\u2026' : 'Upload image'}
+                                                    <input
+                                                        type="file"
+                                                        accept=".jpg,.jpeg,.png,.webp"
+                                                        className="hidden"
+                                                        disabled={ogImageUploading}
+                                                        onChange={async (e) => {
+                                                            const file = e.target.files?.[0];
+                                                            if (!file) return;
+                                                            try {
+                                                                setOgImageUploading(true);
+                                                                const fd = new FormData();
+                                                                fd.append('file', file);
+                                                                fd.append('bucket', 'products');
+                                                                const res = await fetch('/api/admin/upload', { method: 'POST', body: fd, credentials: 'include' });
+                                                                const data = await res.json().catch(() => ({}));
+                                                                if (data?.url) setOgImage(data.url);
+                                                            } finally {
+                                                                setOgImageUploading(false);
+                                                                e.target.value = '';
+                                                            }
+                                                        }}
+                                                    />
+                                                </label>
+                                                {firstImage?.url && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setOgImage('')}
+                                                        className="px-4 py-2 border-2 border-gray-300 rounded-lg text-sm font-semibold text-gray-700 hover:border-gray-900 hover:bg-gray-50 transition-colors"
+                                                    >
+                                                        Use first product image
+                                                    </button>
+                                                )}
+                                                {ogImage && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setOgImage('')}
+                                                        className="px-3 py-2 text-sm font-medium text-red-600 hover:underline"
+                                                    >
+                                                        Clear
+                                                    </button>
+                                                )}
+                                            </div>
+                                            <p className="text-xs text-gray-500">
+                                                Recommended 1200&times;630 px. If empty, the first product image is used automatically.
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Indexing */}
+                            <div className="space-y-3 pt-4 border-t border-gray-200">
+                                <h4 className="text-sm font-bold text-gray-900 uppercase tracking-wider">Indexing</h4>
+                                <label className="flex items-start gap-3 p-4 border-2 border-gray-200 rounded-xl cursor-pointer hover:border-gray-300 transition-colors">
+                                    <input
+                                        type="checkbox"
+                                        checked={robotsIndex}
+                                        onChange={(e) => setRobotsIndex(e.target.checked)}
+                                        className="mt-0.5 w-4 h-4 rounded border-gray-300 text-gray-900 focus:ring-gray-900"
+                                    />
+                                    <div className="flex-1">
+                                        <p className="text-sm font-semibold text-gray-900">Allow search engines to index this product</p>
+                                        <p className="text-xs text-gray-500 mt-0.5">
+                                            Uncheck to hide this product from Google, Bing and other search engines (it stays visible on your storefront).
+                                        </p>
+                                    </div>
+                                </label>
                             </div>
                         </div>
-                    )}
+                        );
+                    })()}
                 </div>
             </div>
         </div>

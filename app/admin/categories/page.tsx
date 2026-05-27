@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
+import { DragDropContext, Droppable, Draggable, type DropResult } from '@hello-pangea/dnd';
 import { supabase } from '@/lib/supabase';
 
 export default function AdminCategoriesPage() {
@@ -13,6 +14,8 @@ export default function AdminCategoriesPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [reorderSaving, setReorderSaving] = useState(false);
+  const [reorderStatus, setReorderStatus] = useState<'idle' | 'success' | 'error'>('idle');
 
   // Form State
   const [formData, setFormData] = useState({
@@ -35,6 +38,7 @@ export default function AdminCategoriesPage() {
       const { data, error } = await supabase
         .from('categories')
         .select('*')
+        .order('position', { ascending: true, nullsFirst: false })
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -43,6 +47,58 @@ export default function AdminCategoriesPage() {
       console.error('Error fetching categories:', err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  /**
+   * Featured categories sorted by their current `position`. Falls back to name when
+   * positions are missing so the UI stays predictable on first use.
+   */
+  const featuredCategories = useMemo(() => {
+    return [...categories]
+      .filter((c) => c.metadata?.featured === true)
+      .sort((a, b) => {
+        const posA = typeof a.position === 'number' ? a.position : Number.MAX_SAFE_INTEGER;
+        const posB = typeof b.position === 'number' ? b.position : Number.MAX_SAFE_INTEGER;
+        if (posA !== posB) return posA - posB;
+        return (a.name || '').localeCompare(b.name || '');
+      });
+  }, [categories]);
+
+  const handleReorderFeatured = async (result: DropResult) => {
+    if (!result.destination) return;
+    const sourceIndex = result.source.index;
+    const destIndex = result.destination.index;
+    if (sourceIndex === destIndex) return;
+
+    const reordered = [...featuredCategories];
+    const [moved] = reordered.splice(sourceIndex, 1);
+    reordered.splice(destIndex, 0, moved);
+
+    const updates = reordered.map((cat, index) => ({ id: cat.id, position: index + 1 }));
+    const updateMap = new Map(updates.map((u) => [u.id, u.position]));
+    setCategories((prev) =>
+      prev.map((c) => (updateMap.has(c.id) ? { ...c, position: updateMap.get(c.id) } : c))
+    );
+
+    setReorderSaving(true);
+    setReorderStatus('idle');
+
+    try {
+      const results = await Promise.all(
+        updates.map((u) => supabase.from('categories').update({ position: u.position }).eq('id', u.id))
+      );
+      const failed = results.find((r) => r.error);
+      if (failed?.error) throw failed.error;
+
+      setReorderStatus('success');
+      setTimeout(() => setReorderStatus('idle'), 2500);
+    } catch (err: any) {
+      console.error('Error saving order:', err);
+      setReorderStatus('error');
+      fetchCategories();
+    } finally {
+      setReorderSaving(false);
     }
   };
 
@@ -201,6 +257,122 @@ export default function AdminCategoriesPage() {
           <p className="text-sm text-gray-600 mb-1">Featured</p>
           <p className="text-2xl font-bold text-blue-700">{categories.filter(c => c.metadata?.featured).length}</p>
         </div>
+      </div>
+
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        <div className="flex items-start justify-between gap-4 mb-4 flex-wrap">
+          <div>
+            <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+              <i className="ri-drag-move-2-line text-xl"></i>
+              Homepage order
+            </h2>
+            <p className="text-sm text-gray-500 mt-1">
+              Drag to reorder the <strong>“Shop by Category”</strong> section on the homepage. Only categories
+              marked <em>Featured on homepage</em> appear here.
+            </p>
+          </div>
+          <div className="text-sm">
+            {reorderSaving && (
+              <span className="inline-flex items-center gap-1.5 text-gray-500">
+                <i className="ri-loader-4-line animate-spin"></i>
+                Saving…
+              </span>
+            )}
+            {!reorderSaving && reorderStatus === 'success' && (
+              <span className="inline-flex items-center gap-1.5 text-green-700">
+                <i className="ri-check-line"></i>
+                Order saved
+              </span>
+            )}
+            {!reorderSaving && reorderStatus === 'error' && (
+              <span className="inline-flex items-center gap-1.5 text-red-700">
+                <i className="ri-error-warning-line"></i>
+                Couldn&apos;t save — please retry
+              </span>
+            )}
+          </div>
+        </div>
+
+        {loading ? (
+          <p className="text-sm text-gray-500 py-6 text-center">Loading…</p>
+        ) : featuredCategories.length === 0 ? (
+          <div className="text-center py-8 border-2 border-dashed border-gray-200 rounded-xl bg-gray-50/50">
+            <i className="ri-star-line text-3xl text-gray-300 mb-2 block"></i>
+            <p className="text-sm text-gray-600">
+              No categories are featured yet. Edit a category and tick <strong>Feature on homepage</strong> to
+              place it here.
+            </p>
+          </div>
+        ) : (
+          <DragDropContext onDragEnd={handleReorderFeatured}>
+            <Droppable droppableId="featured-categories">
+              {(droppableProvided) => (
+                <ul
+                  ref={droppableProvided.innerRef}
+                  {...droppableProvided.droppableProps}
+                  className="space-y-2"
+                >
+                  {featuredCategories.map((category, index) => (
+                    <Draggable key={category.id} draggableId={category.id} index={index}>
+                      {(dragProvided, snapshot) => (
+                        <li
+                          ref={dragProvided.innerRef}
+                          {...dragProvided.draggableProps}
+                          className={`flex items-center gap-4 p-3 rounded-xl border transition-all ${
+                            snapshot.isDragging
+                              ? 'border-gray-900 bg-gray-50 shadow-lg'
+                              : 'border-gray-200 bg-white hover:border-gray-300'
+                          }`}
+                        >
+                          <span
+                            {...dragProvided.dragHandleProps}
+                            className="w-9 h-9 flex items-center justify-center text-gray-400 hover:text-gray-700 cursor-grab active:cursor-grabbing"
+                            aria-label="Drag to reorder"
+                          >
+                            <i className="ri-draggable text-xl"></i>
+                          </span>
+
+                          <span className="w-7 h-7 flex items-center justify-center bg-gray-900 text-white text-sm font-bold rounded-full">
+                            {index + 1}
+                          </span>
+
+                          <div className="w-12 h-12 bg-gray-100 rounded-lg overflow-hidden border border-gray-200 flex-shrink-0">
+                            {category.image_url ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img
+                                src={category.image_url}
+                                alt={category.name}
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center text-gray-400">
+                                <i className="ri-image-line text-lg"></i>
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="flex-1 min-w-0">
+                            <p className="font-semibold text-gray-900 truncate">{category.name}</p>
+                            <p className="text-xs text-gray-500 font-mono truncate">{category.slug}</p>
+                          </div>
+
+                          <span className={`px-2.5 py-1 rounded-full text-[10px] font-semibold whitespace-nowrap capitalize ${
+                            category.status === 'active'
+                              ? 'bg-green-100 text-green-700'
+                              : 'bg-gray-100 text-gray-600'
+                          }`}>
+                            {category.status}
+                          </span>
+                        </li>
+                      )}
+                    </Draggable>
+                  ))}
+                  {droppableProvided.placeholder}
+                </ul>
+              )}
+            </Droppable>
+          </DragDropContext>
+        )}
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-200">

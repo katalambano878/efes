@@ -82,12 +82,12 @@ export default function Home() {
           setFeaturedProducts(Array.isArray(productsData) ? productsData : []);
         }
 
-        // Fetch featured categories (featured is stored in metadata JSONB)
         const { data: categoriesData, error: categoriesError } = await supabase
           .from('categories')
-          .select('id, name, slug, image_url, metadata')
+          .select('id, name, slug, image_url, metadata, position')
           .eq('status', 'active')
-          .order('name');
+          .order('position', { ascending: true, nullsFirst: false })
+          .order('name', { ascending: true });
 
         if (categoriesError) {
           setCategories([]);
