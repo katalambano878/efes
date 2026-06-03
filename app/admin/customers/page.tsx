@@ -209,6 +209,29 @@ export default function AdminCustomersPage() {
     if (added > 0) fetchCustomers();
   };
 
+  const handleDeleteCustomer = async (customerId: string, customerName: string) => {
+    if (!confirm(`Delete ${customerName || 'this customer'}? This cannot be undone.`)) return;
+    const res = await fetch(`/api/admin/customers/${customerId}`, {
+      method: 'DELETE',
+      credentials: 'include',
+    });
+    const data = await res.json().catch(() => ({}));
+    if (res.ok) {
+      setCustomers((prev) => prev.filter((c) => c.id !== customerId));
+      setSelectedCustomers((prev) => prev.filter((id) => id !== customerId));
+    } else {
+      alert(data.error || 'Could not delete customer');
+    }
+  };
+
+  const handleEmailCustomer = (email: string) => {
+    if (!email || email.endsWith('@manual.local')) {
+      alert('No valid email on file for this customer.');
+      return;
+    }
+    window.location.href = `mailto:${encodeURIComponent(email)}`;
+  };
+
   const handleExport = () => {
     const rows = filteredCustomers.length > 0 ? filteredCustomers : customers;
     const header = ['Name', 'Phone', 'Email', 'Orders', 'Total Spent', 'Status', 'Joined'];
@@ -674,10 +697,20 @@ export default function AdminCustomersPage() {
                         >
                           <i className="ri-eye-line text-lg"></i>
                         </Link>
-                        <button className="w-8 h-8 flex items-center justify-center text-gray-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer">
+                        <button
+                          type="button"
+                          onClick={() => handleEmailCustomer(customer.email)}
+                          className="w-8 h-8 flex items-center justify-center text-gray-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
+                          title="Send email"
+                        >
                           <i className="ri-mail-line text-lg"></i>
                         </button>
-                        <button className="w-8 h-8 flex items-center justify-center text-gray-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors cursor-pointer">
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteCustomer(customer.id, customer.name)}
+                          className="w-8 h-8 flex items-center justify-center text-gray-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
+                          title="Delete customer"
+                        >
                           <i className="ri-delete-bin-line text-lg"></i>
                         </button>
                       </div>
