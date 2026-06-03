@@ -24,7 +24,7 @@ export const SITE_KNOWLEDGE: SiteKnowledgeEntry[] = [
 
 Visit us at Dansoman Sahara bus stop. Store hours: Monday–Saturday, 8am–8pm.
 
-Instagram: @efescloset1 | TikTok: @MSs_____efe`,
+Instagram: @efescloset1 | TikTok: @MSs_____efe | Snapchat: feli_wiafe2021`,
     keywords: ['about', 'efescloset', 'clothing', 'style', 'quality', 'dansoman', 'sahara'],
   },
   {
@@ -33,11 +33,13 @@ Instagram: @efescloset1 | TikTok: @MSs_____efe`,
     path: '/contact',
     category: 'contact',
     content: `Efescloset contact details:
-Phone: 0550398805 or 0272712187
+Phone: 0550398805
+WhatsApp: 0272712187
 Location: Dansoman Sahara bus stop
 Hours: Monday–Saturday, 8am–8pm
 Instagram: @efescloset1
 TikTok: @MSs_____efe
+Snapchat: feli_wiafe2021
 
 You can also use the contact form on the website or create a support ticket via this chat.`,
     keywords: ['contact', 'phone', '0550398805', '0272712187', 'address', 'dansoman', 'sahara', 'hours'],

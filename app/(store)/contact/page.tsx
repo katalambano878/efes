@@ -90,7 +90,13 @@ export default function ContactPage() {
   // Get contact details from CMS settings
   const contactEmail = getSetting('contact_email') || 'contact@efescloset.com';
   const contactPhone = getSetting('contact_phone') || '0550398805';
+  const whatsappNumber = getSetting('social_whatsapp') || '0272712187';
   const contactAddress = getSetting('contact_address') || 'Dansoman Sahara bus stop';
+  const socialTikTok = getSetting('social_tiktok') || 'https://tiktok.com/@MSs_____efe';
+  const socialSnapchat = getSetting('social_snapchat') || 'https://snapchat.com/add/feli_wiafe2021';
+
+  const waDigits = whatsappNumber.replace(/\D/g, '').replace(/^233/, '').replace(/^0/, '');
+  const whatsappLink = waDigits ? `https://wa.me/233${waDigits}` : '';
 
   const heroTitle = pageContent?.title || 'Get In Touch';
   const heroSubtitle = pageContent?.subtitle || 'Have a question or need assistance?';
@@ -113,8 +119,8 @@ export default function ContactPage() {
     {
       icon: 'ri-whatsapp-line',
       title: 'WhatsApp',
-      value: contactPhone,
-      link: `https://wa.me/233${contactPhone.replace(/^0/, '')}`,
+      value: whatsappNumber,
+      link: whatsappLink || `https://wa.me/233${whatsappNumber.replace(/^0/, '')}`,
       description: 'Chat with us instantly'
     },
     {
@@ -169,7 +175,23 @@ export default function ContactPage() {
           ))}
         </div>
 
-
+        <div className="flex flex-wrap justify-center gap-4 mb-16">
+          {[
+            { label: 'TikTok @MSs_____efe', link: socialTikTok, icon: 'ri-tiktok-line' },
+            { label: 'Snapchat feli_wiafe2021', link: socialSnapchat, icon: 'ri-snapchat-line' },
+          ].map((s) => (
+            <a
+              key={s.label}
+              href={s.link}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 px-5 py-3 rounded-full border border-gray-200 bg-gray-50 text-gray-800 font-medium text-sm hover:bg-gray-100 transition-colors"
+            >
+              <i className={`${s.icon} text-lg`} />
+              {s.label}
+            </a>
+          ))}
+        </div>
 
         <div className="grid lg:grid-cols-2 gap-12">
           <div>

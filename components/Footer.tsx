@@ -64,6 +64,11 @@ export default function Footer() {
   const socialInstagram = getSetting('social_instagram') || '';
   const socialTwitter = getSetting('social_twitter') || '';
   const socialTikTok = getSetting('social_tiktok') || '';
+  const socialSnapchat = getSetting('social_snapchat') || '';
+  const socialWhatsapp = getSetting('social_whatsapp') || contactPhone;
+  const whatsappLink = socialWhatsapp
+    ? `https://wa.me/233${socialWhatsapp.replace(/\D/g, '').replace(/^233/, '').replace(/^0/, '')}`
+    : '';
 
   return (
     <footer className="bg-gray-900 text-white rounded-t-[2.5rem] mt-8 lg:mt-0 overflow-hidden">
@@ -117,12 +122,14 @@ export default function Footer() {
               {siteTagline}
             </p>
 
-            <div className="flex gap-4 pt-2">
+            <div className="flex gap-4 pt-2 flex-wrap">
               {[
                 { link: socialInstagram, icon: 'ri-instagram-line' },
                 { link: socialTikTok, icon: 'ri-tiktok-fill' },
+                { link: socialSnapchat, icon: 'ri-snapchat-line' },
+                { link: whatsappLink, icon: 'ri-whatsapp-line' },
                 { link: socialFacebook, icon: 'ri-facebook-fill' },
-                { link: socialTwitter, icon: 'ri-twitter-x-fill' }
+                { link: socialTwitter, icon: 'ri-twitter-x-fill' },
               ].map((social, i) => social.link && (
                 <a
                   key={i}

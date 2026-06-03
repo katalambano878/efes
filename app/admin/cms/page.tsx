@@ -25,10 +25,11 @@ const DEFAULT_SETTINGS: SettingsMap = {
   currency: 'GHS',
   currency_symbol: 'GH₵',
   social_instagram: '',
-  social_tiktok: '',
+  social_tiktok: 'https://tiktok.com/@MSs_____efe',
+  social_snapchat: 'https://snapchat.com/add/feli_wiafe2021',
   social_facebook: '',
   social_twitter: '',
-  social_whatsapp: '',
+  social_whatsapp: '0272712187',
   announcement_text: '',
   announcement_active: 'false',
   announcement_bg_color: '#171717',
@@ -435,7 +436,7 @@ CREATE POLICY "Allow authenticated write" ON site_settings
                         type="text"
                         value={settings.social_whatsapp}
                         onChange={e => updateSetting('social_whatsapp', e.target.value)}
-                        placeholder="0550398805"
+                        placeholder="0272712187"
                         className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent outline-none"
                       />
                     </FieldGroup>
@@ -469,7 +470,14 @@ CREATE POLICY "Allow authenticated write" ON site_settings
                     label="TikTok"
                     value={settings.social_tiktok}
                     onChange={v => updateSetting('social_tiktok', v)}
-                    placeholder="https://tiktok.com/@yourhandle"
+                    placeholder="https://tiktok.com/@MSs_____efe"
+                  />
+                  <SocialField
+                    icon="ri-snapchat-line"
+                    label="Snapchat"
+                    value={settings.social_snapchat || ''}
+                    onChange={v => updateSetting('social_snapchat', v)}
+                    placeholder="https://snapchat.com/add/feli_wiafe2021"
                   />
                   <SocialField
                     icon="ri-facebook-circle-line"

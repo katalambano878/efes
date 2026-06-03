@@ -1,8 +1,75 @@
 'use client';
 
 import Link from 'next/link';
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
+
+type ImportRow = { fullName: string; phone: string; email: string };
+
+function normalizeGhPhone(raw: string): string | null {
+  const d = raw.replace(/\D/g, '');
+  if (d.length < 9) return null;
+  if (d.startsWith('233') && d.length >= 12) return `0${d.slice(3, 12)}`;
+  if (d.startsWith('0') && d.length >= 10) return d.slice(0, 10);
+  if (d.length === 9) return `0${d}`;
+  return null;
+}
+
+function looksLikePhone(s: string) {
+  return s.replace(/\D/g, '').length >= 9;
+}
+
+function parseCustomerImportLine(line: string): ImportRow | null {
+  const trimmed = line.trim();
+  if (!trimmed || trimmed.startsWith('#')) return null;
+
+  const parts = trimmed.includes(',')
+    ? trimmed.split(',').map((p) => p.trim())
+    : trimmed.includes('\t')
+      ? trimmed.split('\t').map((p) => p.trim())
+      : trimmed.includes('|')
+        ? trimmed.split('|').map((p) => p.trim())
+        : [trimmed];
+
+  if (parts.length === 1) {
+    const phone = normalizeGhPhone(parts[0]);
+    if (!phone) return null;
+    return { fullName: '', phone, email: '' };
+  }
+
+  let fullName = '';
+  let phoneRaw = '';
+  let email = '';
+
+  if (looksLikePhone(parts[0])) {
+    phoneRaw = parts[0];
+    fullName = parts[1] || '';
+    email = parts[2] || '';
+  } else {
+    fullName = parts[0] || '';
+    phoneRaw = parts[1] || '';
+    email = parts[2] || '';
+  }
+
+  const phone = normalizeGhPhone(phoneRaw);
+  if (!phone) return null;
+
+  return { fullName, phone, email: email.toLowerCase() };
+}
+
+function parseImportText(text: string): ImportRow[] {
+  const rows: ImportRow[] = [];
+  const seen = new Set<string>();
+  for (const line of text.split(/\r?\n/)) {
+    const row = parseCustomerImportLine(line);
+    if (!row) continue;
+    const key = row.phone.replace(/\D/g, '');
+    if (seen.has(key)) continue;
+    seen.add(key);
+    rows.push(row);
+  }
+  return rows;
+}
 
 export default function AdminCustomersPage() {
   const [searchQuery, setSearchQuery] = useState('');
@@ -18,6 +85,12 @@ export default function AdminCustomersPage() {
   const [addSaving, setAddSaving] = useState(false);
   const [addError, setAddError] = useState('');
   const [addSuccess, setAddSuccess] = useState('');
+
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [importText, setImportText] = useState('');
+  const [importSaving, setImportSaving] = useState(false);
+  const [importResult, setImportResult] = useState<{ added: number; skipped: number; invalid: number } | null>(null);
+  const importFileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     fetchCustomers();
@@ -66,6 +139,74 @@ export default function AdminCustomersPage() {
     setAddSuccess(`${fullName || phoneRaw || email} added.`);
     setAddForm({ fullName: '', phone: '', email: '' });
     fetchCustomers();
+  };
+
+  const handleImportFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      setImportText(String(reader.result || ''));
+      setImportResult(null);
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  };
+
+  const handleBulkImport = async () => {
+    const parsed = parseImportText(importText);
+    if (parsed.length === 0) {
+      setImportResult({ added: 0, skipped: 0, invalid: 1 });
+      return;
+    }
+
+    const existingPhones = new Set(
+      customers.map((c) => String(c.phone || '').replace(/\D/g, '')).filter(Boolean)
+    );
+    const existingEmails = new Set(
+      customers.map((c) => String(c.email || '').toLowerCase()).filter((e) => e && !e.endsWith('@manual.local'))
+    );
+
+    setImportSaving(true);
+    setImportResult(null);
+
+    let added = 0;
+    let skipped = 0;
+    const invalid = importText.split(/\r?\n/).filter((l) => l.trim() && !l.trim().startsWith('#')).length - parsed.length;
+
+    for (const row of parsed) {
+      const phoneKey = row.phone.replace(/\D/g, '');
+      const digits = phoneKey;
+      const email = row.email || `${digits}@manual.local`;
+
+      if (existingPhones.has(phoneKey) || existingEmails.has(email)) {
+        skipped += 1;
+        continue;
+      }
+
+      const nameParts = row.fullName.trim().split(/\s+/);
+      const { error } = await supabase.from('customers').insert([{
+        email,
+        phone: row.phone,
+        full_name: row.fullName.trim() || null,
+        first_name: nameParts[0] || null,
+        last_name: nameParts.slice(1).join(' ') || null,
+        tags: ['imported', 'bulk'],
+      }]);
+
+      if (error) {
+        if (error.code === '23505') skipped += 1;
+        else skipped += 1;
+      } else {
+        added += 1;
+        existingPhones.add(phoneKey);
+        existingEmails.add(email);
+      }
+    }
+
+    setImportSaving(false);
+    setImportResult({ added, skipped, invalid: Math.max(0, invalid) });
+    if (added > 0) fetchCustomers();
   };
 
   const handleExport = () => {
@@ -357,6 +498,13 @@ export default function AdminCustomersPage() {
             Export Customers
           </button>
           <button
+            onClick={() => { setShowImportModal(true); setImportText(''); setImportResult(null); }}
+            className="bg-white border-2 border-indigo-200 hover:bg-indigo-50 text-indigo-800 px-5 py-3 rounded-lg font-semibold transition-colors whitespace-nowrap cursor-pointer"
+          >
+            <i className="ri-upload-line mr-2"></i>
+            Import Customers
+          </button>
+          <button
             onClick={() => { setShowAddModal(true); setAddError(''); setAddSuccess(''); }}
             className="bg-gray-900 hover:bg-gray-800 text-white px-6 py-3 rounded-lg font-semibold transition-colors whitespace-nowrap cursor-pointer"
           >
@@ -548,6 +696,96 @@ export default function AdminCustomersPage() {
           </div>
         </div>
       </div>
+
+      {/* Bulk Import Modal */}
+      {showImportModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50" onClick={() => !importSaving && setShowImportModal(false)} />
+          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+            <div className="p-6 border-b border-gray-100 flex items-center justify-between sticky top-0 bg-white">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-indigo-100 rounded-xl flex items-center justify-center">
+                  <i className="ri-upload-cloud-2-line text-xl text-indigo-700" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold text-gray-900">Import Customers</h2>
+                  <p className="text-xs text-gray-500">Paste numbers or upload a CSV for SMS/marketing</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowImportModal(false)}
+                disabled={importSaving}
+                className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg"
+              >
+                <i className="ri-close-line text-xl" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-3 text-sm text-indigo-900">
+                <p className="font-semibold mb-1">Supported formats (one per line)</p>
+                <ul className="list-disc list-inside text-indigo-800 space-y-0.5 text-xs">
+                  <li><code className="bg-white/80 px-1 rounded">0249549608</code> — phone only</li>
+                  <li><code className="bg-white/80 px-1 rounded">Ama Mensah, 0249549608</code></li>
+                  <li><code className="bg-white/80 px-1 rounded">Name, Phone, email@optional.com</code></li>
+                </ul>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1.5">Paste contacts</label>
+                <textarea
+                  value={importText}
+                  onChange={(e) => { setImportText(e.target.value); setImportResult(null); }}
+                  rows={8}
+                  placeholder={'Ama Mensah, 0551234567\n0249549608\nKwame Asante, 0272712187'}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm font-mono focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  {parseImportText(importText).length} valid row(s) detected
+                </p>
+              </div>
+
+              <div>
+                <input ref={importFileRef} type="file" accept=".csv,.txt" className="hidden" onChange={handleImportFile} />
+                <button
+                  type="button"
+                  onClick={() => importFileRef.current?.click()}
+                  className="w-full py-2.5 border-2 border-dashed border-gray-300 rounded-xl text-sm font-medium text-gray-600 hover:border-indigo-300 hover:bg-indigo-50/50"
+                >
+                  <i className="ri-file-text-line mr-2" />
+                  Upload CSV or .txt file
+                </button>
+              </div>
+
+              {importResult && (
+                <div className={`p-4 rounded-xl text-sm ${importResult.added > 0 ? 'bg-green-50 border border-green-200 text-green-800' : 'bg-amber-50 border border-amber-200 text-amber-800'}`}>
+                  <p><strong>{importResult.added}</strong> added · <strong>{importResult.skipped}</strong> skipped (duplicate)</p>
+                  {importResult.invalid > 0 && <p className="mt-1">{importResult.invalid} line(s) could not be parsed</p>}
+                </div>
+              )}
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowImportModal(false)}
+                  disabled={importSaving}
+                  className="flex-1 px-4 py-2.5 border border-gray-300 text-gray-700 font-medium rounded-xl hover:bg-gray-50"
+                >
+                  {importResult?.added ? 'Done' : 'Cancel'}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleBulkImport}
+                  disabled={importSaving || parseImportText(importText).length === 0}
+                  className="flex-1 px-4 py-2.5 bg-indigo-600 text-white font-semibold rounded-xl hover:bg-indigo-700 disabled:opacity-50"
+                >
+                  {importSaving ? 'Importing...' : 'Import now'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Add Customer Modal */}
       {showAddModal && (
