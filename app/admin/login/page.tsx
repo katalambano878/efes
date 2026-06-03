@@ -21,7 +21,7 @@ export default function AdminLoginPage() {
     if (errorParam === 'role_disabled') {
       setError('Your role has been disabled by the administrator. Contact your Super Admin for access.');
     } else if (errorParam === 'unauthorized') {
-      setError('You do not have permission to access the admin panel.');
+      setError('You do not have permission to access the admin panel. Riders must sign in with credentials created via Delivery → Riders → Enable App Login.');
     } else if (errorParam === 'no_profile') {
       setError('No admin profile found. From project root run: node scripts/create-admin.mjs');
     } else if (errorParam === 'config') {
@@ -57,8 +57,22 @@ export default function AdminLoginPage() {
         document.cookie = `sb-access-token=${data.session.access_token}; path=/; max-age=${60 * 60 * 24 * 7}; SameSite=Lax${secure}`;
         document.cookie = `sb-refresh-token=${data.session.refresh_token}; path=/; max-age=${60 * 60 * 24 * 30}; SameSite=Lax${secure}`;
 
-        // Full-page redirect so the first request to /admin includes the cookie (avoids RSC fetch race).
-        window.location.href = '/admin';
+        // Full-page redirect so the first request includes the cookie (avoids RSC fetch race).
+        // Riders go straight to their deliveries view.
+        let redirectTo = '/admin';
+        try {
+          const meRes = await fetch('/api/admin/me', {
+            credentials: 'include',
+            headers: { Authorization: `Bearer ${data.session.access_token}` },
+          });
+          if (meRes.ok) {
+            const me = await meRes.json();
+            if (me?.profile?.role === 'rider') redirectTo = '/admin/delivery/my-deliveries';
+          }
+        } catch {
+          // fall back to /admin; middleware will route riders
+        }
+        window.location.href = redirectTo;
       }
     } catch (err: any) {
       const msg = err?.message || 'Login failed';
@@ -80,7 +94,7 @@ export default function AdminLoginPage() {
             <img src="/logo.png" alt="Store" className="h-8 w-auto mx-auto" />
           </Link>
           <h1 className="text-3xl font-bold text-gray-900 mt-6 mb-2">Admin Login</h1>
-          <p className="text-gray-600">Sign in to access the admin dashboard</p>
+          <p className="text-gray-600">Sign in for admin, staff, or rider access</p>
         </div>
 
         <div className="bg-white rounded-2xl shadow-xl p-8 border border-gray-100">

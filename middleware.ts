@@ -82,7 +82,8 @@ export async function middleware(request: NextRequest) {
                     .eq('id', user.id)
                     .single();
 
-                if (!profile || (profile.role !== 'admin' && profile.role !== 'staff')) {
+                const role = profile?.role != null ? String(profile.role) : '';
+                if (!profile || !['admin', 'staff', 'rider'].includes(role)) {
                     const loginUrl = new URL('/admin/login', request.url);
                     loginUrl.searchParams.set('error', 'unauthorized');
                     return NextResponse.redirect(loginUrl);
@@ -91,7 +92,7 @@ export async function middleware(request: NextRequest) {
                 const { data: roleConfig } = await supabase
                     .from('roles')
                     .select('enabled')
-                    .eq('id', profile.role)
+                    .eq('id', role)
                     .single();
 
                 if (roleConfig && !roleConfig.enabled) {
@@ -100,8 +101,13 @@ export async function middleware(request: NextRequest) {
                     return NextResponse.redirect(loginUrl);
                 }
 
+                // Riders may only access their deliveries page
+                if (role === 'rider' && !pathname.startsWith('/admin/delivery/my-deliveries')) {
+                    return NextResponse.redirect(new URL('/admin/delivery/my-deliveries', request.url));
+                }
+
                 response.headers.set('x-user-id', user.id);
-                response.headers.set('x-user-role', profile.role);
+                response.headers.set('x-user-role', role);
 
             } catch (err) {
                 console.error('[Middleware] Auth check error:', err);
