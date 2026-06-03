@@ -13,7 +13,7 @@ import { useRecaptcha } from '@/hooks/useRecaptcha';
 export default function CheckoutPage() {
   usePageTitle('Checkout');
   const router = useRouter();
-  const { cart, subtotal: cartSubtotal, clearCart } = useCart();
+  const { cart, subtotal: cartSubtotal, clearCart, appliedCoupon, couponDiscount } = useCart();
 
   const [currentStep, setCurrentStep] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
@@ -91,7 +91,8 @@ export default function CheckoutPage() {
   const subtotal = cartSubtotal;
   const shippingCost = 0; // Delivery options temporarily disabled
   const tax = 0; // No Tax
-  const total = subtotal + shippingCost + tax;
+  const discount = Math.min(couponDiscount || 0, subtotal);
+  const total = Math.max(0, subtotal + shippingCost + tax - discount);
 
   const validateShipping = () => {
     const newErrors: any = {};
@@ -172,6 +173,8 @@ export default function CheckoutPage() {
           subtotal,
           tax,
           shippingCost,
+          discountTotal: discount,
+          couponCode: appliedCoupon?.code || null,
           total,
           deliveryMethod,
           paymentMethod,
@@ -590,12 +593,19 @@ export default function CheckoutPage() {
           </div>
 
           <div className="lg:col-span-1">
+            {/*
+              Store credit redemption at checkout — NOT in original scope (deferred).
+              Would show logged-in customer's customers.store_credit balance and let them
+              apply it toward the order total before payment (separate from coupon codes).
+            */}
             <OrderSummary
               items={cart}
               subtotal={subtotal}
               shipping={shippingCost}
               tax={tax}
               total={total}
+              discount={discount}
+              couponCode={appliedCoupon?.code || null}
             />
           </div>
         </div>

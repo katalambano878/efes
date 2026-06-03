@@ -1,39 +1,42 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+function getAccessToken(request: Request): string | null {
+  const authHeader = request.headers.get('authorization');
+  if (authHeader?.startsWith('Bearer ')) return authHeader.slice(7).trim();
 
-async function getAuthenticatedAdmin(request: Request) {
   const cookieHeader = request.headers.get('cookie') || '';
-  const authToken = cookieHeader
+  const match = cookieHeader.match(/\bsb-access-token=([^;]+)/);
+  if (match) return decodeURIComponent(match[1].trim());
+
+  // Fallback: Supabase may store as sb-<project>-auth-token (JSON array)
+  const authCookie = cookieHeader
     .split(';')
     .map((c) => c.trim())
-    .find((c) => c.startsWith('sb-') && c.includes('-auth-token'))
-    ?.split('=')
-    .slice(1)
-    .join('=');
+    .find((c) => c.startsWith('sb-') && (c.includes('-auth-token') || c.includes('auth')));
+  if (!authCookie) return null;
 
-  if (!authToken) return null;
-
-  const decoded = decodeURIComponent(authToken);
-  let tokenData: any;
+  const value = authCookie.split('=').slice(1).join('=').trim();
+  const decoded = decodeURIComponent(value);
   try {
-    tokenData = JSON.parse(decoded);
+    const parsed = JSON.parse(decoded);
+    if (Array.isArray(parsed) && parsed[0]) return parsed[0];
+    if (parsed?.access_token) return parsed.access_token;
+    if (typeof parsed === 'string') return parsed;
   } catch {
-    tokenData = decoded;
+    return decoded;
   }
+  return null;
+}
 
-  const accessToken = typeof tokenData === 'string' ? tokenData : tokenData?.[0] || tokenData?.access_token;
-  if (!accessToken) return null;
+async function getAuthenticatedAdmin(request: Request) {
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) return null;
 
-  const supabase = createClient(supabaseUrl, supabaseKey, {
-    global: { headers: { Authorization: `Bearer ${accessToken}` } },
-  });
+  const token = getAccessToken(request);
+  if (!token) return null;
 
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return null;
+  const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
+  if (error || !user) return null;
 
   const { data: profile } = await supabaseAdmin
     .from('profiles')

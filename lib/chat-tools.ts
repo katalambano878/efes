@@ -273,11 +273,12 @@ export async function initiateReturn(
 
   if (!order) return null;
   if (order.user_id !== userId) return null;
-  if (order.status !== 'delivered') return null;
+  if (order.status === 'cancelled' || order.status === 'refunded') return null;
 
-  const deliveredDate = new Date(order.created_at);
-  const daysSinceDelivery = (Date.now() - deliveredDate.getTime()) / (1000 * 60 * 60 * 24);
-  if (daysSinceDelivery > 30) return null;
+  // Exchange-only policy: requests must be made within 24 hours of purchase.
+  const purchaseDate = new Date(order.created_at);
+  const hoursSincePurchase = (Date.now() - purchaseDate.getTime()) / (1000 * 60 * 60);
+  if (hoursSincePurchase > 24) return null;
 
   const { data: ret, error } = await supabase
     .from('return_requests')
@@ -332,12 +333,12 @@ export async function getRecommendations(
 // ─── 9. Get Store Info (static) ─────────────────────────────────────────────
 
 const STORE_INFO: Record<string, string> = {
-  shipping: `We deliver across Ghana. Standard delivery takes 1-3 business days within Accra and 3-7 business days outside Accra. Shipping fees vary by location and are calculated at checkout.`,
-  returns: `We accept returns within 30 days of delivery for unused items in original packaging. To start a return, go to your account or ask me to help. Refunds are processed within 5-7 business days after we receive the item.`,
+  shipping: `We deliver across Ghana. Order before 10am and we deliver the same day; order after 10am and we deliver the next day. Shipping fees vary by location and are calculated at checkout.`,
+  returns: `We do NOT offer refunds. We only accept exchanges, and the exchange must be requested within 24 hours of purchase. Items must be unused and in original packaging. To request an exchange, go to your account or ask me to help.`,
   payment: `We accept Mobile Money (MTN, Vodafone Cash, AirtelTigo Money) via our secure Moolre payment gateway. Cash on delivery is available for orders within Accra.`,
   contact: `Efescloset — Call 0550398805 or 0272712187. Visit us at Dansoman Sahara bus stop. Hours: Monday–Saturday, 8am–8pm. Instagram: @efescloset1 | TikTok: @MSs_____efe.`,
   about: `Efescloset — Style meets quality. Trusted clothing brand. Located at Dansoman Sahara bus stop. Monday–Saturday, 8am–8pm.`,
-  delivery_times: `Accra: 1-3 business days\nKumasi, Takoradi, Cape Coast: 3-5 business days\nOther regions: 5-7 business days\nExpress delivery available for Accra (same day/next day) at extra cost.`,
+  delivery_times: `Order before 10am → same-day delivery.\nOrder after 10am → next-day delivery.\nThe 10am cut-off is the deadline for same-day delivery.`,
   hours: `Store hours: Monday–Saturday, 8am–8pm. Online ordering available 24/7.`,
 };
 

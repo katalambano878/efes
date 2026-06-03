@@ -14,16 +14,16 @@ export default function ShippingPage() {
   const deliveryOptions = [
     {
       type: 'Standard Delivery',
-      time: '2-5 Business Days',
+      time: 'Same Day / Next Day',
       cost: 'GHS 20',
-      description: 'Perfect for regular orders with no rush',
+      description: 'Order before 10am for same-day delivery, after 10am for next-day delivery',
       icon: 'ri-truck-line'
     },
     {
       type: 'Express Delivery',
-      time: 'Next Day',
+      time: 'Priority Same Day',
       cost: 'GHS 40',
-      description: 'Available for Accra & Kumasi orders placed before 2pm',
+      description: 'Priority same-day delivery for Accra & Kumasi orders placed before 10am',
       icon: 'ri-rocket-line'
     },
     {
@@ -39,25 +39,25 @@ export default function ShippingPage() {
     {
       zone: 'Zone 1 - Accra Metro',
       areas: 'East Legon, Osu, Labone, Airport, Dzorwulu, Cantonments, Adabraka, Tema',
-      standard: '1-2 days',
-      express: 'Next day'
+      standard: 'Same day (by 10am) / Next day',
+      express: 'Same day'
     },
     {
       zone: 'Zone 2 - Greater Accra',
       areas: 'Zone 2 delivery areas',
-      standard: '2-3 days',
-      express: 'Next day'
+      standard: 'Same day (by 10am) / Next day',
+      express: 'Same day'
     },
     {
       zone: 'Zone 3 - Major Cities',
       areas: 'Kumasi, Takoradi, Cape Coast, Tamale, Sunyani, Ho, Koforidua',
-      standard: '3-4 days',
-      express: '1-2 days'
+      standard: 'Next day',
+      express: 'Same day / Next day'
     },
     {
       zone: 'Zone 4 - Other Areas',
       areas: 'All other locations within Ghana',
-      standard: '4-5 days',
+      standard: 'Next day',
       express: 'Not available'
     }
   ];
@@ -142,7 +142,7 @@ export default function ShippingPage() {
                 <div>
                   <h3 className="font-bold text-gray-900 mb-2">Order Processing</h3>
                   <p className="text-gray-600 leading-relaxed">
-                    Orders placed before 2pm are processed same day. We carefully pack your items and prepare them for dispatch.
+                    Orders placed before 10am are delivered the same day. Orders placed after 10am are delivered the next day. We carefully pack your items and prepare them for dispatch.
                   </p>
                 </div>
               </div>
@@ -194,7 +194,7 @@ export default function ShippingPage() {
                   Cut-off Times
                 </h3>
                 <p className="text-gray-600 leading-relaxed text-sm">
-                  Orders placed before 2pm are dispatched same day. Orders after 2pm are dispatched next business day.
+                  Order before 10am and your package is delivered the same day. Orders placed after 10am are delivered the next day.
                 </p>
               </div>
 

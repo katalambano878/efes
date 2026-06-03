@@ -32,7 +32,6 @@ export default function ReturnsPortalPage() {
   const [email, setEmail] = useState('');
   const [selectedItems, setSelectedItems] = useState<number[]>([]);
   const [returnReasons, setReturnReasons] = useState<Record<number, string>>({});
-  const [returnType, setReturnType] = useState<'refund' | 'exchange'>('refund');
   const [isLoading, setIsLoading] = useState(false);
   const [foundOrder, setFoundOrder] = useState<any>(null);
 
@@ -41,9 +40,6 @@ export default function ReturnsPortalPage() {
     'Wrong item received',
     'Defective/damaged item',
     'Not as described',
-    'Changed my mind',
-    'Better price elsewhere',
-    'No longer needed',
     'Other'
   ];
 
@@ -76,8 +72,8 @@ export default function ReturnsPortalPage() {
   return (
     <main className="min-h-screen bg-gray-50 py-12">
         <div className="max-w-4xl mx-auto px-4">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Returns Portal</h1>
-          <p className="text-gray-600 mb-8">Start your return or exchange process</p>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">Exchange Portal</h1>
+          <p className="text-gray-600 mb-8">Request an exchange within 24 hours of purchase. Please note: we do not offer refunds — exchanges only.</p>
 
           <div className="mb-8">
             <div className="flex items-center justify-between">
@@ -96,10 +92,10 @@ export default function ReturnsPortalPage() {
                 </div>
               ))}
             </div>
-            <div className="flex justify-between mt-2">
+              <div className="flex justify-between mt-2">
               <span className="text-sm font-semibold text-gray-900">Find Order</span>
               <span className="text-sm font-semibold text-gray-900">Select Items</span>
-              <span className="text-sm font-semibold text-gray-900">Submit</span>
+              <span className="text-sm font-semibold text-gray-900">Submit Exchange</span>
             </div>
           </div>
 
@@ -148,12 +144,12 @@ export default function ReturnsPortalPage() {
                 <div className="flex items-start space-x-3">
                   <i className="ri-information-line text-xl text-blue-700 mt-0.5"></i>
                   <div className="text-sm text-blue-700">
-                    <p className="font-semibold mb-1">Return Policy Highlights</p>
+                    <p className="font-semibold mb-1">Exchange Policy Highlights</p>
                     <ul className="space-y-1">
-                      <li>• Returns accepted within 30 days of delivery</li>
+                      <li>• No refunds — exchanges only</li>
+                      <li>• Exchanges accepted within 24 hours of purchase</li>
                       <li>• Items must be unused with original tags</li>
-                      <li>• Free return shipping for defective items</li>
-                      <li>• Refunds processed within 5-7 business days</li>
+                      <li>• After 24 hours, exchanges can no longer be processed</li>
                     </ul>
                   </div>
                 </div>
@@ -163,7 +159,7 @@ export default function ReturnsPortalPage() {
 
           {step === 2 && foundOrder && (
             <div className="bg-white rounded-xl shadow-sm p-8">
-              <h2 className="text-2xl font-bold text-gray-900 mb-6">Select Items to Return</h2>
+              <h2 className="text-2xl font-bold text-gray-900 mb-6">Select Items to Exchange</h2>
               
               <div className="mb-6 p-4 bg-gray-50 rounded-lg">
                 <p className="text-sm text-gray-600">
@@ -191,7 +187,7 @@ export default function ReturnsPortalPage() {
                         {selectedItems.includes(item.id) && (
                           <div className="mt-4">
                             <label className="block text-sm font-semibold text-gray-900 mb-2">
-                              Reason for return *
+                              Reason for exchange *
                             </label>
                             <select
                               value={returnReasons[item.id] || ''}
@@ -217,36 +213,14 @@ export default function ReturnsPortalPage() {
 
               <div className="mb-8">
                 <label className="block text-sm font-semibold text-gray-900 mb-3">
-                  What would you like to do? *
+                  What happens next?
                 </label>
-                <div className="grid grid-cols-2 gap-4">
-                  <button
-                    type="button"
-                    onClick={() => setReturnType('refund')}
-                    className={`p-4 rounded-lg border-2 text-left transition-all ${
-                      returnType === 'refund'
-                        ? 'border-gray-900 bg-gray-100'
-                        : 'border-gray-300 hover:border-gray-400'
-                    }`}
-                  >
-                    <i className="ri-refund-line text-2xl text-gray-900 mb-2"></i>
-                    <p className="font-semibold text-gray-900">Get a Refund</p>
-                    <p className="text-sm text-gray-600 mt-1">Money back to original payment</p>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setReturnType('exchange')}
-                    className={`p-4 rounded-lg border-2 text-left transition-all ${
-                      returnType === 'exchange'
-                        ? 'border-gray-900 bg-gray-100'
-                        : 'border-gray-300 hover:border-gray-400'
-                    }`}
-                  >
-                    <i className="ri-exchange-line text-2xl text-gray-900 mb-2"></i>
-                    <p className="font-semibold text-gray-900">Exchange Item</p>
-                    <p className="text-sm text-gray-600 mt-1">Get a different size or color</p>
-                  </button>
+                <div className="p-4 rounded-lg border-2 border-gray-900 bg-gray-100 text-left">
+                  <i className="ri-exchange-line text-2xl text-gray-900 mb-2"></i>
+                  <p className="font-semibold text-gray-900">Exchange Item</p>
+                  <p className="text-sm text-gray-600 mt-1">
+                    Get a different size, colour, or product. We do not offer refunds — exchanges only, and your request must be made within 24 hours of purchase.
+                  </p>
                 </div>
               </div>
 
@@ -273,7 +247,7 @@ export default function ReturnsPortalPage() {
               <h2 className="text-2xl font-bold text-gray-900 mb-6">Review & Submit</h2>
 
               <div className="mb-8">
-                <h3 className="font-semibold text-gray-900 mb-4">Return Summary</h3>
+                <h3 className="font-semibold text-gray-900 mb-4">Exchange Summary</h3>
                 <div className="space-y-3">
                   {foundOrder.items
                     .filter((item: any) => selectedItems.includes(item.id))
@@ -294,19 +268,19 @@ export default function ReturnsPortalPage() {
                 <ol className="space-y-2 text-sm text-gray-700">
                   <li className="flex items-start space-x-2">
                     <span className="font-bold">1.</span>
-                    <span>Print your prepaid return label (sent to your email)</span>
+                    <span>Submit your exchange request within 24 hours of purchase</span>
                   </li>
                   <li className="flex items-start space-x-2">
                     <span className="font-bold">2.</span>
-                    <span>Pack items securely in original packaging</span>
+                    <span>Keep items unused and in original packaging with tags</span>
                   </li>
                   <li className="flex items-start space-x-2">
                     <span className="font-bold">3.</span>
-                    <span>Attach the label and drop off at any shipping location</span>
+                    <span>Our team will confirm your exchange and arrange the swap</span>
                   </li>
                   <li className="flex items-start space-x-2">
                     <span className="font-bold">4.</span>
-                    <span>Track your return status in your account</span>
+                    <span>Remember: we offer exchanges only — no refunds</span>
                   </li>
                 </ol>
               </div>
@@ -323,7 +297,7 @@ export default function ReturnsPortalPage() {
                   disabled={isLoading}
                   className="flex-1 py-4 bg-gray-700 hover:bg-gray-800 text-white rounded-lg font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
                 >
-                  {isLoading ? 'Submitting...' : 'Submit Return Request'}
+                  {isLoading ? 'Submitting...' : 'Submit Exchange Request'}
                 </button>
               </div>
             </div>

@@ -64,7 +64,7 @@ export default function AssignmentsPage() {
     const [selectedAssignment, setSelectedAssignment] = useState<Assignment | null>(null);
 
     const [assignForm, setAssignForm] = useState({ rider_id: '', priority: 'normal', delivery_notes: '', delivery_fee: '', estimated_delivery: '' });
-    const [updateForm, setUpdateForm] = useState({ status: '', delivery_notes: '', failure_reason: '' });
+    const [updateForm, setUpdateForm] = useState({ status: '', delivery_notes: '', failure_reason: '', delivery_fee: '' });
     const [saving, setSaving] = useState(false);
     const [toast, setToast] = useState('');
 
@@ -109,7 +109,12 @@ export default function AssignmentsPage() {
 
     function openUpdateModal(assignment: Assignment) {
         setSelectedAssignment(assignment);
-        setUpdateForm({ status: assignment.status, delivery_notes: assignment.delivery_notes || '', failure_reason: '' });
+        setUpdateForm({
+            status: assignment.status,
+            delivery_notes: assignment.delivery_notes || '',
+            failure_reason: '',
+            delivery_fee: assignment.delivery_fee != null ? String(assignment.delivery_fee) : '',
+        });
         setShowUpdateModal(true);
     }
 
@@ -153,6 +158,7 @@ export default function AssignmentsPage() {
                     status: updateForm.status,
                     delivery_notes: updateForm.delivery_notes || null,
                     failure_reason: updateForm.failure_reason || null,
+                    delivery_fee: updateForm.delivery_fee === '' ? null : updateForm.delivery_fee,
                 }),
             });
             const data = await res.json();
@@ -400,11 +406,11 @@ export default function AssignmentsPage() {
                                     </select>
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-semibold text-gray-900 mb-2">Delivery Fee (GH₵)</label>
+                                    <label className="block text-sm font-semibold text-gray-900 mb-2">Delivery Fee (GH₵) <span className="text-gray-400 font-normal">— optional</span></label>
                                     <input type="number" step="0.01" value={assignForm.delivery_fee}
                                         onChange={e => setAssignForm(f => ({ ...f, delivery_fee: e.target.value }))}
                                         className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-gray-600"
-                                        placeholder="20.00" />
+                                        placeholder="Optional — rider can decide" />
                                 </div>
                             </div>
 
@@ -474,6 +480,15 @@ export default function AssignmentsPage() {
                                         rows={2} placeholder="Why did the delivery fail?" />
                                 </div>
                             )}
+
+                            <div>
+                                <label className="block text-sm font-semibold text-gray-900 mb-2">Delivery Fee (GH₵) <span className="text-gray-400 font-normal">— optional</span></label>
+                                <input type="number" step="0.01" min="0" value={updateForm.delivery_fee}
+                                    onChange={e => setUpdateForm(f => ({ ...f, delivery_fee: e.target.value }))}
+                                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-gray-600"
+                                    placeholder="Leave blank to tell the customer verbally" />
+                                <p className="text-xs text-gray-400 mt-1">The rider can set the fee here, or leave it blank and tell the customer the amount on delivery.</p>
+                            </div>
 
                             <div>
                                 <label className="block text-sm font-semibold text-gray-900 mb-2">Notes</label>

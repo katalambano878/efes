@@ -56,51 +56,48 @@ const articles: any = {
   },
   '6': {
     id: 6,
-    title: 'How do I return an item?',
-    category: 'Returns & Refunds',
+    title: 'How do I exchange an item?',
+    category: 'Exchanges',
     views: 2341,
     helpful: 456,
     updated: 'January 20, 2024',
     content: `
-      <h2>Our Return Process</h2>
-      <p>We want you to love your purchase! If you're not satisfied, returns are easy.</p>
+      <h2>Our Exchange Process</h2>
+      <p>We want you to love your purchase! Please note: we do not offer refunds — we only accept exchanges, and they must be requested within 24 hours of purchase.</p>
       
-      <h3>Step 1: Start Your Return</h3>
+      <h3>Step 1: Start Your Exchange</h3>
       <ol>
-        <li>Go to the <a href="/returns">Returns Portal</a></li>
+        <li>Go to the <a href="/returns">Exchange Portal</a></li>
         <li>Enter your order number and email</li>
-        <li>Select the items you want to return</li>
-        <li>Choose a return reason</li>
+        <li>Select the items you want to exchange</li>
+        <li>Choose an exchange reason</li>
       </ol>
       
-      <h3>Step 2: Print Your Return Label</h3>
-      <p>After submitting your return request, you'll receive a prepaid return label via email. Simply print it and attach it to your package.</p>
+      <h3>Step 2: Submit Within 24 Hours</h3>
+      <p>Your exchange request must be submitted within 24 hours of purchase. After 24 hours, we can no longer process an exchange.</p>
       
-      <h3>Step 3: Ship Your Return</h3>
-      <p>Drop off your package at any authorized shipping location. You can find locations near you on our returns page.</p>
+      <h3>Step 3: Keep Your Item Ready</h3>
+      <p>Keep your item unused and in its original packaging with all tags attached so we can complete the exchange.</p>
       
-      <h3>Step 4: Get Your Refund</h3>
-      <p>Once we receive your return, we'll process it within 3-5 business days. Your refund will be issued to your original payment method.</p>
+      <h3>Step 4: Get Your Replacement</h3>
+      <p>Once we confirm your exchange, we'll arrange the swap for a different size, colour, or product. Remember — we offer exchanges only, no refunds.</p>
       
-      <h2>Return Policy Details</h2>
+      <h2>Exchange Policy Details</h2>
       <ul>
-        <li>You have 30 days from delivery to start a return</li>
-        <li>Items must be unused and in original packaging</li>
-        <li>Return shipping is free for defective items</li>
-        <li>Standard returns have a small shipping fee</li>
+        <li>No refunds — exchanges only</li>
+        <li>Exchanges must be requested within 24 hours of purchase</li>
+        <li>Items must be unused and in original packaging with tags</li>
+        <li>After 24 hours, exchanges can no longer be processed</li>
       </ul>
-      
-      <h2>Exchange Instead?</h2>
-      <p>Looking for a different size or color? You can choose to exchange your item instead of returning it for a refund.</p>
     `
   }
 };
 
 const relatedArticles = [
-  { id: 7, title: 'What is your return policy?', category: 'Returns' },
-  { id: 8, title: 'When will I get my refund?', category: 'Returns' },
-  { id: 9, title: 'Can I exchange instead of return?', category: 'Returns' },
-  { id: 10, title: 'How do I print a return label?', category: 'Returns' }
+  { id: 7, title: 'What is your exchange policy?', category: 'Exchanges' },
+  { id: 8, title: 'How long do I have to request an exchange?', category: 'Exchanges' },
+  { id: 9, title: 'Do you offer refunds?', category: 'Exchanges' },
+  { id: 10, title: 'How do I request an exchange?', category: 'Exchanges' }
 ];
 
 export default function ArticlePage() {

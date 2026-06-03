@@ -62,7 +62,7 @@ export async function GET(request: Request) {
   }
 
   const role = profile.role != null ? String(profile.role) : '';
-  if (role !== 'admin' && role !== 'staff') {
+  if (role !== 'admin' && role !== 'staff' && role !== 'rider') {
     return NextResponse.json({ error: 'Not admin or staff' }, { status: 403 });
   }
 

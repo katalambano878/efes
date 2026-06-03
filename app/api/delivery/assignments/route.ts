@@ -123,7 +123,7 @@ export async function PATCH(req: NextRequest) {
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const body = await req.json();
-    const { id, status, delivery_notes, failure_reason, proof_of_delivery } = body;
+    const { id, status, delivery_notes, failure_reason, proof_of_delivery, delivery_fee } = body;
 
     if (!id || !status) {
         return NextResponse.json({ error: 'id and status are required' }, { status: 400 });
@@ -154,6 +154,10 @@ export async function PATCH(req: NextRequest) {
     }
     if (delivery_notes) updateData.delivery_notes = delivery_notes;
     if (proof_of_delivery) updateData.proof_of_delivery = proof_of_delivery;
+    if (delivery_fee !== undefined && delivery_fee !== null && delivery_fee !== '') {
+        const fee = parseFloat(String(delivery_fee));
+        if (!isNaN(fee) && fee >= 0) updateData.delivery_fee = fee;
+    }
 
     const { data: updated, error } = await supabaseAdmin
         .from('delivery_assignments')

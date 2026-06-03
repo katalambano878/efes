@@ -14,6 +14,15 @@ export type CartItem = {
     moq?: number; // Minimum Order Quantity
 };
 
+export type AppliedCoupon = {
+    code: string;
+    description: string;
+    type: 'percentage' | 'fixed_amount' | 'free_shipping';
+    value: number;
+    minimumPurchase: number;
+    maximumDiscount: number | null;
+};
+
 type CartContextType = {
     cart: CartItem[];
     addToCart: (item: CartItem) => void;
@@ -24,6 +33,10 @@ type CartContextType = {
     subtotal: number;
     isCartOpen: boolean;
     setIsCartOpen: (isOpen: boolean) => void;
+    appliedCoupon: AppliedCoupon | null;
+    applyCoupon: (coupon: AppliedCoupon) => void;
+    removeCoupon: () => void;
+    couponDiscount: number;
 };
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
@@ -32,6 +45,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
     const [cart, setCart] = useState<CartItem[]>([]);
     const [isCartOpen, setIsCartOpen] = useState(false);
     const [isInitialized, setIsInitialized] = useState(false);
+    const [appliedCoupon, setAppliedCoupon] = useState<AppliedCoupon | null>(null);
 
     // Direct cart toggle
     const handleSetCartOpen = (isOpen: boolean) => {
@@ -71,6 +85,15 @@ export function CartProvider({ children }: { children: ReactNode }) {
                 localStorage.removeItem('cart');
             }
         }
+        // Load applied coupon
+        const savedCoupon = localStorage.getItem('appliedCoupon');
+        if (savedCoupon) {
+            try {
+                setAppliedCoupon(JSON.parse(savedCoupon));
+            } catch {
+                localStorage.removeItem('appliedCoupon');
+            }
+        }
         setIsInitialized(true);
     }, []);
 
@@ -81,6 +104,16 @@ export function CartProvider({ children }: { children: ReactNode }) {
             window.dispatchEvent(new Event('cartUpdated')); // Keep compatibility with legacy listeners if any
         }
     }, [cart, isInitialized]);
+
+    // Persist applied coupon
+    useEffect(() => {
+        if (!isInitialized) return;
+        if (appliedCoupon) {
+            localStorage.setItem('appliedCoupon', JSON.stringify(appliedCoupon));
+        } else {
+            localStorage.removeItem('appliedCoupon');
+        }
+    }, [appliedCoupon, isInitialized]);
 
     const addToCart = (newItem: CartItem) => {
         setCart((prevCart) => {
@@ -137,10 +170,28 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
     const clearCart = () => {
         setCart([]);
+        setAppliedCoupon(null);
     };
+
+    const applyCoupon = (coupon: AppliedCoupon) => setAppliedCoupon(coupon);
+    const removeCoupon = () => setAppliedCoupon(null);
 
     const cartCount = cart.reduce((sum, item) => sum + item.quantity, 0);
     const subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+
+    // Compute coupon discount against current subtotal
+    let couponDiscount = 0;
+    if (appliedCoupon) {
+        if (appliedCoupon.type === 'percentage') {
+            couponDiscount = subtotal * (appliedCoupon.value / 100);
+            if (appliedCoupon.maximumDiscount != null) {
+                couponDiscount = Math.min(couponDiscount, appliedCoupon.maximumDiscount);
+            }
+        } else if (appliedCoupon.type === 'fixed_amount') {
+            couponDiscount = Math.min(appliedCoupon.value, subtotal);
+        }
+        couponDiscount = Math.max(0, Math.round(couponDiscount * 100) / 100);
+    }
 
     return (
         <CartContext.Provider value={{
@@ -152,7 +203,11 @@ export function CartProvider({ children }: { children: ReactNode }) {
             cartCount,
             subtotal,
             isCartOpen,
-            setIsCartOpen: handleSetCartOpen
+            setIsCartOpen: handleSetCartOpen,
+            appliedCoupon,
+            applyCoupon,
+            removeCoupon,
+            couponDiscount,
         }}>
             {children}
         </CartContext.Provider>

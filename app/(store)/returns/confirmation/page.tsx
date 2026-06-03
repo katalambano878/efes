@@ -5,7 +5,7 @@ import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 
 export default function ReturnConfirmationPage() {
-  const returnId = `RET-2024-${Math.floor(Math.random() * 10000)}`;
+  const returnId = `EXC-2024-${Math.floor(Math.random() * 10000)}`;
 
   return (
     <>
@@ -17,10 +17,10 @@ export default function ReturnConfirmationPage() {
               <i className="ri-check-line text-4xl text-gray-900"></i>
             </div>
 
-            <h1 className="text-3xl font-bold text-gray-900 mb-4">Return Request Submitted!</h1>
-            <p className="text-gray-600 mb-2">Your return has been successfully processed</p>
+            <h1 className="text-3xl font-bold text-gray-900 mb-4">Exchange Request Submitted!</h1>
+            <p className="text-gray-600 mb-2">Your exchange request has been successfully submitted</p>
             <p className="text-sm text-gray-500 mb-8">
-              Return ID: <span className="font-semibold">{returnId}</span>
+              Exchange ID: <span className="font-semibold">{returnId}</span>
             </p>
 
             <div className="mb-8 p-6 bg-blue-50 border border-blue-200 rounded-xl text-left">
@@ -34,19 +34,19 @@ export default function ReturnConfirmationPage() {
               <ul className="text-sm text-gray-700 space-y-2">
                 <li className="flex items-start space-x-2">
                   <i className="ri-checkbox-circle-fill text-gray-700 mt-0.5"></i>
-                  <span>Prepaid return shipping label</span>
+                  <span>Your exchange request confirmation</span>
                 </li>
                 <li className="flex items-start space-x-2">
                   <i className="ri-checkbox-circle-fill text-gray-700 mt-0.5"></i>
-                  <span>Packing instructions</span>
+                  <span>Instructions for swapping your item</span>
                 </li>
                 <li className="flex items-start space-x-2">
                   <i className="ri-checkbox-circle-fill text-gray-700 mt-0.5"></i>
-                  <span>Nearest drop-off locations</span>
+                  <span>Our store location and contact details</span>
                 </li>
                 <li className="flex items-start space-x-2">
                   <i className="ri-checkbox-circle-fill text-gray-700 mt-0.5"></i>
-                  <span>Return tracking number</span>
+                  <span>Your exchange reference number</span>
                 </li>
               </ul>
             </div>
@@ -59,8 +59,8 @@ export default function ReturnConfirmationPage() {
                     <span className="font-bold text-gray-900">1</span>
                   </div>
                   <div>
-                    <p className="font-semibold text-gray-900">Print Your Label</p>
-                    <p className="text-sm text-gray-600">Download and print the return label from your email</p>
+                    <p className="font-semibold text-gray-900">Check Your Email</p>
+                    <p className="text-sm text-gray-600">Review your exchange confirmation and instructions</p>
                   </div>
                 </div>
 
@@ -69,8 +69,8 @@ export default function ReturnConfirmationPage() {
                     <span className="font-bold text-gray-900">2</span>
                   </div>
                   <div>
-                    <p className="font-semibold text-gray-900">Pack Your Items</p>
-                    <p className="text-sm text-gray-600">Securely pack items in original packaging with all tags</p>
+                    <p className="font-semibold text-gray-900">Keep Your Items Ready</p>
+                    <p className="text-sm text-gray-600">Keep items unused, in original packaging with all tags</p>
                   </div>
                 </div>
 
@@ -79,8 +79,8 @@ export default function ReturnConfirmationPage() {
                     <span className="font-bold text-gray-900">3</span>
                   </div>
                   <div>
-                    <p className="font-semibold text-gray-900">Ship It Back</p>
-                    <p className="text-sm text-gray-600">Drop off at any authorized shipping location</p>
+                    <p className="font-semibold text-gray-900">We Confirm Your Exchange</p>
+                    <p className="text-sm text-gray-600">Our team reviews your request and arranges the swap</p>
                   </div>
                 </div>
 
@@ -89,8 +89,8 @@ export default function ReturnConfirmationPage() {
                     <span className="font-bold text-gray-900">4</span>
                   </div>
                   <div>
-                    <p className="font-semibold text-gray-900">Get Your Refund</p>
-                    <p className="text-sm text-gray-600">Refund processed within 5-7 days after we receive your return</p>
+                    <p className="font-semibold text-gray-900">Get Your Replacement</p>
+                    <p className="text-sm text-gray-600">Receive your exchanged item — remember, no refunds, exchanges only</p>
                   </div>
                 </div>
               </div>
@@ -124,10 +124,10 @@ export default function ReturnConfirmationPage() {
               <div>
                 <p className="font-semibold text-amber-900 mb-2">Important Reminders</p>
                 <ul className="text-sm text-amber-800 space-y-1">
-                  <li>• Return must be shipped within 7 days</li>
+                  <li>• Exchanges must be requested within 24 hours of purchase</li>
                   <li>• Items must be unused with original tags</li>
-                  <li>• Keep your tracking number for reference</li>
-                  <li>• Refund will be issued to original payment method</li>
+                  <li>• We do not offer refunds — exchanges only</li>
+                  <li>• Keep your exchange reference number for reference</li>
                 </ul>
               </div>
             </div>

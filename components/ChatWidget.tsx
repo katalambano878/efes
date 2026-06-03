@@ -64,6 +64,8 @@ type ChatAction = {
   couponCode?: string;
   label?: string;
   paymentUrl?: string;
+  autoAdd?: boolean;
+  quantity?: number;
 };
 
 type ChatMessage = {
@@ -229,6 +231,27 @@ export default function ChatWidget() {
     }
   }, [open]);
 
+  // Auto-add items the AI added to the cart via the add_to_cart tool
+  const applyAutoCartActions = useCallback((actions?: ChatAction[]) => {
+    if (!Array.isArray(actions)) return;
+    const autoAdds = actions.filter((a) => a.autoAdd && a.product);
+    if (autoAdds.length === 0) return;
+    autoAdds.forEach((a) => {
+      const p = a.product!;
+      addToCart({
+        id: p.id,
+        name: p.name,
+        price: p.price,
+        image: p.image,
+        quantity: a.quantity || p.moq || 1,
+        slug: p.slug,
+        maxStock: p.maxStock,
+        moq: p.moq,
+      });
+    });
+    setIsCartOpen(true);
+  }, [addToCart, setIsCartOpen]);
+
   // Send message
   const send = useCallback(async (text?: string) => {
     const msgText = (text || input).trim();
@@ -277,6 +300,7 @@ export default function ChatWidget() {
         timestamp: Date.now(),
       };
       setMessages((prev) => [...prev, assistantMsg]);
+      applyAutoCartActions(data.actions);
       if (!open) setUnread((u) => u + 1);
     } catch {
       setMessages((prev) => [
@@ -286,7 +310,7 @@ export default function ChatWidget() {
     } finally {
       setLoading(false);
     }
-  }, [input, loading, messages, open, pathname, cart, clearCart]);
+  }, [input, loading, messages, open, pathname, cart, clearCart, applyAutoCartActions]);
 
   const handleAddToCart = useCallback((product: ChatProduct) => {
     const item: CartItem = {
@@ -390,6 +414,7 @@ export default function ChatWidget() {
         timestamp: Date.now(),
       };
       setMessages(prev => [...prev, assistantMsg]);
+      applyAutoCartActions(chatData.actions);
       if (!open) setUnread(u => u + 1);
 
       if (chatData.message) {
@@ -419,7 +444,7 @@ export default function ChatWidget() {
       setLoading(false);
       setVoiceProcessing(null);
     }
-  }, [messages, open, pathname, cart, clearCart]);
+  }, [messages, open, pathname, cart, clearCart, applyAutoCartActions]);
 
   sendVoiceRef.current = sendVoiceMessage;
 

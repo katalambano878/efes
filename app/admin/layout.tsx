@@ -78,7 +78,7 @@ export default function AdminLayout({
           return;
         }
         const role = profileData?.role != null ? String(profileData.role) : '';
-        if (role !== 'admin' && role !== 'staff') {
+        if (role !== 'admin' && role !== 'staff' && role !== 'rider') {
           document.cookie = `sb-access-token=; path=/; max-age=0; SameSite=Lax${secure}`;
           await supabase.auth.signOut();
           router.push('/admin/login?error=unauthorized');
@@ -89,6 +89,11 @@ export default function AdminLayout({
         setUserRole(role);
         if (Object.keys(permissions).length > 0) setRolePermissions(permissions);
         setIsAuthenticated(true);
+
+        // Riders have a restricted view — send them straight to their deliveries
+        if (role === 'rider' && (pathname === '/admin' || pathname === '/admin/login')) {
+          router.replace('/admin/delivery/my-deliveries');
+        }
       } catch {
         router.push('/admin/login');
       } finally {
@@ -277,6 +282,12 @@ export default function AdminLayout({
       permissionKey: 'blog'
     },
     {
+      title: 'My Deliveries',
+      icon: 'ri-e-bike-2-line',
+      path: '/admin/delivery/my-deliveries',
+      permissionKey: 'my_deliveries'
+    },
+    {
       title: 'Delivery Hub',
       icon: 'ri-truck-line',
       path: '/admin/delivery',
@@ -304,6 +315,9 @@ export default function AdminLayout({
 
   const visibleMenuItems = menuItems.filter(item => {
     if (item.moduleId && !enabledModules.includes(item.moduleId)) return false;
+    // "My Deliveries" is only for the rider role
+    if (item.permissionKey === 'my_deliveries') return userRole === 'rider';
+    if (userRole === 'rider') return false;
     if (userRole === 'admin') return true;
     if (item.permissionKey && Object.keys(rolePermissions).length > 0) {
       return rolePermissions[item.permissionKey] === true;

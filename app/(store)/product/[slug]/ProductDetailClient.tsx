@@ -706,7 +706,7 @@ export default function ProductDetailClient({ slug }: { slug: string }) {
                       </div>
                       <div className="flex items-center">
                         <i className="ri-arrow-left-right-line text-xl mr-3 text-gray-900"></i>
-                        <span>30-day easy returns and exchanges</span>
+                        <span>Exchanges only (no refunds) within 24 hours of purchase</span>
                       </div>
                       <div className="flex items-center">
                         <i className="ri-shield-check-line text-xl mr-3 text-gray-900"></i>

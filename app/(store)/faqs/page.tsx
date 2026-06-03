@@ -40,7 +40,7 @@ export default function FAQsPage() {
     {
       category: 'shipping',
       question: 'What are your delivery times?',
-      answer: 'Standard delivery takes 2-5 business days within Ghana. Express delivery (next-day) is available for Accra and Kumasi. Orders placed before 2pm are dispatched same day. Remote areas may take 5-7 business days.'
+      answer: 'It depends on when you order. Order before 10am and your item is delivered the same day. Order after 10am and it will be delivered the next day. Store pickup is available the same day from our Accra location.'
     },
     {
       category: 'shipping',
@@ -60,22 +60,22 @@ export default function FAQsPage() {
     {
       category: 'returns',
       question: 'What is your return policy?',
-      answer: 'We offer a 14-day return policy for unused items in original packaging. Simply initiate a return from your account, print the return label, and ship it back. Refunds are processed within 5-7 business days after we receive the item.'
+      answer: 'We do not offer refunds. We only accept exchanges, and your exchange must be requested within 24 hours of purchase. Items must be unused, in original packaging, with tags attached.'
     },
     {
       category: 'returns',
-      question: 'Which items cannot be returned?',
-      answer: 'For hygiene reasons, we cannot accept returns on opened cosmetics, intimate apparel, earrings, or perishable goods. Custom or personalised items are also non-returnable unless defective.'
+      question: 'Do you offer refunds?',
+      answer: 'No. We do not issue refunds under any circumstances. If there is an issue with your item, we offer an exchange instead — provided you request it within 24 hours of purchase.'
     },
     {
       category: 'returns',
-      question: 'Who pays for return shipping?',
-      answer: 'If you\'re returning due to a defect or our error, we cover return shipping. For change-of-mind returns, customers pay return shipping costs (GHS 15 standard rate). Free shipping on returns for defective items.'
+      question: 'How long do I have to request an exchange?',
+      answer: 'Exchanges are only accepted within 24 hours of purchase. After 24 hours have passed, we can no longer process an exchange, so please reach out promptly.'
     },
     {
       category: 'returns',
-      question: 'Can I exchange an item instead of returning it?',
-      answer: 'Yes! If you need a different size or colour, select "Exchange" when initiating your return. We\'ll send the replacement as soon as we receive your original item. Exchange shipping is FREE.'
+      question: 'Can I exchange an item?',
+      answer: 'Yes — exchanges are the only option we offer. If you need a different size, colour, or product, request your exchange within 24 hours of purchase and we\'ll arrange the swap.'
     },
     {
       category: 'payment',
@@ -95,12 +95,12 @@ export default function FAQsPage() {
     {
       category: 'payment',
       question: 'When will my payment be charged?',
-      answer: 'For card and mobile money payments, you\'re charged immediately. For Cash on Delivery, you pay when you receive your order. If an item is out of stock, we\'ll refund you within 24 hours.'
+      answer: 'For card and mobile money payments, you\'re charged immediately. For Cash on Delivery, you pay when you receive your order.'
     },
     {
       category: 'payment',
       question: 'How do refunds work?',
-      answer: 'Refunds are processed to your original payment method within 5-7 business days after we receive and inspect your return. For mobile money refunds, ensure you provide correct details. You\'ll receive confirmation via email.'
+      answer: 'We do not offer refunds. If there is a problem with your order, we provide an exchange instead — as long as you request it within 24 hours of purchase.'
     },
     {
       category: 'account',
@@ -262,9 +262,9 @@ export default function FAQsPage() {
             <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mb-4">
               <i className="ri-arrow-go-back-line text-2xl text-gray-900"></i>
             </div>
-            <h3 className="text-xl font-bold text-gray-900 mb-2">Returns Policy</h3>
+            <h3 className="text-xl font-bold text-gray-900 mb-2">Exchange Policy</h3>
             <p className="text-gray-600 leading-relaxed">
-              Understand our return process, timeframes, and refund policy
+              Exchanges only (no refunds) — request within 24 hours of purchase
             </p>
           </Link>
 

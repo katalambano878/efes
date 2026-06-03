@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import DeliveryNav from '../DeliveryNav';
+import { supabase } from '@/lib/supabase';
 
 interface Zone { id: string; name: string; }
 
@@ -9,7 +10,7 @@ interface Rider {
     id: string; full_name: string; phone: string; email: string | null;
     vehicle_type: string; license_plate: string | null; status: string;
     zone_id: string | null; total_deliveries: number; successful_deliveries: number;
-    rating_avg: number; created_at: string;
+    rating_avg: number; created_at: string; auth_user_id: string | null;
     delivery_zones: { id: string; name: string } | null;
 }
 
@@ -40,6 +41,15 @@ export default function RidersPage() {
     });
     const [saving, setSaving] = useState(false);
     const [toast, setToast] = useState('');
+
+    const [loginRider, setLoginRider] = useState<Rider | null>(null);
+    const [loginForm, setLoginForm] = useState({ email: '', password: '' });
+    const [loginSaving, setLoginSaving] = useState(false);
+
+    const authHeaders = useCallback(async (): Promise<Record<string, string>> => {
+        const { data: { session } } = await supabase.auth.getSession();
+        return session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {};
+    }, []);
 
     useEffect(() => { fetchData(); }, []);
 
@@ -126,6 +136,53 @@ export default function RidersPage() {
             const res = await fetch(`/api/delivery/riders?id=${rider.id}`, { method: 'DELETE' });
             if (!res.ok) throw new Error((await res.json()).error);
             showToast('Rider removed');
+            fetchData();
+        } catch (err: any) {
+            showToast(`Error: ${err.message}`);
+        }
+    }
+
+    function openLoginModal(rider: Rider) {
+        setLoginRider(rider);
+        setLoginForm({ email: rider.email || '', password: '' });
+    }
+
+    async function handleEnableLogin() {
+        if (!loginRider) return;
+        if (!loginForm.email.trim() || loginForm.password.length < 6) {
+            showToast('Error: Email and a 6+ character password are required'); return;
+        }
+        setLoginSaving(true);
+        try {
+            const res = await fetch('/api/delivery/riders/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
+                credentials: 'include',
+                body: JSON.stringify({ riderId: loginRider.id, email: loginForm.email.trim(), password: loginForm.password }),
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error);
+            showToast('Login enabled for rider');
+            setLoginRider(null);
+            fetchData();
+        } catch (err: any) {
+            showToast(`Error: ${err.message}`);
+        } finally {
+            setLoginSaving(false);
+        }
+    }
+
+    async function handleRevokeLogin(rider: Rider) {
+        if (!confirm(`Revoke login access for "${rider.full_name}"? They will no longer be able to sign in.`)) return;
+        try {
+            const res = await fetch(`/api/delivery/riders/login?riderId=${rider.id}`, {
+                method: 'DELETE',
+                headers: { ...(await authHeaders()) },
+                credentials: 'include',
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error);
+            showToast('Rider login revoked');
             fetchData();
         } catch (err: any) {
             showToast(`Error: ${err.message}`);
@@ -262,7 +319,24 @@ export default function RidersPage() {
                                             </div>
                                         </div>
 
-                                        <div className="flex gap-2 mt-3 pt-3 border-t border-gray-100">
+                                        <div className="mb-3 pt-3 border-t border-gray-100">
+                                            {rider.auth_user_id ? (
+                                                <div className="flex items-center justify-between gap-2 px-3 py-2 bg-green-50 rounded-lg">
+                                                    <span className="text-xs font-medium text-green-700 flex items-center gap-1.5">
+                                                        <i className="ri-shield-check-line" /> Login enabled
+                                                    </span>
+                                                    <button onClick={() => handleRevokeLogin(rider)}
+                                                        className="text-xs font-medium text-red-600 hover:underline">Revoke</button>
+                                                </div>
+                                            ) : (
+                                                <button onClick={() => openLoginModal(rider)}
+                                                    className="w-full py-2 text-sm font-medium text-blue-600 hover:bg-blue-50 rounded-lg transition-colors flex items-center justify-center gap-1.5">
+                                                    <i className="ri-key-2-line" /> Enable App Login
+                                                </button>
+                                            )}
+                                        </div>
+
+                                        <div className="flex gap-2 pt-3 border-t border-gray-100">
                                             <button onClick={() => openEditModal(rider)}
                                                 className="flex-1 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 rounded-lg transition-colors">
                                                 <i className="ri-edit-line mr-1" /> Edit
@@ -347,6 +421,45 @@ export default function RidersPage() {
                                 <button onClick={handleSave} disabled={saving}
                                     className="flex-1 px-4 py-3 bg-gray-900 text-white rounded-xl hover:bg-gray-800 font-semibold disabled:opacity-50 transition-colors">
                                     {saving ? 'Saving...' : editingRider ? 'Update Rider' : 'Add Rider'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Enable Login Modal */}
+            {loginRider && (
+                <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+                    <div className="bg-white rounded-2xl w-full max-w-md">
+                        <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+                            <h2 className="text-lg font-bold text-gray-900">Enable App Login</h2>
+                            <button onClick={() => setLoginRider(null)} className="p-2 hover:bg-gray-100 rounded-lg"><i className="ri-close-line text-xl" /></button>
+                        </div>
+                        <div className="p-6 space-y-4">
+                            <div className="bg-blue-50 border border-blue-100 rounded-xl p-3 text-sm text-blue-800">
+                                <i className="ri-information-line mr-1" /> Create login credentials for <strong>{loginRider.full_name}</strong>.
+                                They'll sign in at the admin login and only see their own assigned deliveries.
+                            </div>
+                            <div>
+                                <label className="block text-sm font-semibold text-gray-900 mb-1.5">Login Email *</label>
+                                <input type="email" value={loginForm.email} onChange={e => setLoginForm(f => ({ ...f, email: e.target.value }))}
+                                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-gray-600 focus:border-gray-600"
+                                    placeholder="rider@example.com" />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-semibold text-gray-900 mb-1.5">Password *</label>
+                                <input type="text" value={loginForm.password} onChange={e => setLoginForm(f => ({ ...f, password: e.target.value }))}
+                                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-gray-600 focus:border-gray-600"
+                                    placeholder="At least 6 characters" />
+                                <p className="text-xs text-gray-500 mt-1">Share these credentials with the rider. They can be changed later.</p>
+                            </div>
+                            <div className="flex gap-3 pt-2">
+                                <button onClick={() => setLoginRider(null)}
+                                    className="flex-1 px-4 py-3 border border-gray-300 rounded-xl text-gray-700 hover:bg-gray-50 font-medium">Cancel</button>
+                                <button onClick={handleEnableLogin} disabled={loginSaving}
+                                    className="flex-1 px-4 py-3 bg-gray-900 text-white rounded-xl hover:bg-gray-800 font-semibold disabled:opacity-50 transition-colors">
+                                    {loginSaving ? 'Enabling...' : 'Enable Login'}
                                 </button>
                             </div>
                         </div>

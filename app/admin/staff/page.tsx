@@ -41,9 +41,16 @@ export default function StaffPage() {
   const [removingId, setRemovingId] = useState<string | null>(null);
   const [removeLoading, setRemoveLoading] = useState(false);
 
+  const authHeaders = useCallback(async (): Promise<Record<string, string>> => {
+    const { data: { session } } = await supabase.auth.getSession();
+    const token = session?.access_token;
+    return token ? { Authorization: `Bearer ${token}` } : {};
+  }, []);
+
   const fetchStaff = useCallback(async () => {
     try {
-      const res = await fetch('/api/admin/staff', { credentials: 'include' });
+      const headers = await authHeaders();
+      const res = await fetch('/api/admin/staff', { credentials: 'include', headers });
       const data = await res.json();
       if (data.staff) setStaff(data.staff);
     } catch (err) {
@@ -51,7 +58,7 @@ export default function StaffPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [authHeaders]);
 
   useEffect(() => {
     async function init() {
@@ -79,7 +86,7 @@ export default function StaffPage() {
     try {
       const res = await fetch('/api/admin/staff', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
         credentials: 'include',
         body: JSON.stringify({
           email: inviteForm.email,
@@ -119,7 +126,7 @@ export default function StaffPage() {
     try {
       const res = await fetch('/api/admin/staff', {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
         credentials: 'include',
         body: JSON.stringify({
           userId: editingStaff.id,
@@ -150,6 +157,7 @@ export default function StaffPage() {
       const res = await fetch(`/api/admin/staff?userId=${userId}`, {
         method: 'DELETE',
         credentials: 'include',
+        headers: await authHeaders(),
       });
       const data = await res.json();
       if (!res.ok) {

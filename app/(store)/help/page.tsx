@@ -21,15 +21,15 @@ const categories = [
   },
   {
     id: 'returns',
-    title: 'Returns & Refunds',
+    title: 'Exchanges',
     icon: 'ri-arrow-left-right-line',
     count: 10,
     articles: [
-      { id: 6, title: 'How do I return an item?', views: 2341 },
-      { id: 7, title: 'What is your return policy?', views: 1876 },
-      { id: 8, title: 'When will I get my refund?', views: 1432 },
-      { id: 9, title: 'Can I exchange instead of return?', views: 987 },
-      { id: 10, title: 'How do I print a return label?', views: 765 }
+      { id: 6, title: 'How do I exchange an item?', views: 2341 },
+      { id: 7, title: 'What is your exchange policy?', views: 1876 },
+      { id: 8, title: 'How long do I have to request an exchange?', views: 1432 },
+      { id: 9, title: 'Do you offer refunds?', views: 987 },
+      { id: 10, title: 'How do I request an exchange?', views: 765 }
     ]
   },
   {
@@ -88,10 +88,10 @@ const categories = [
 
 const popularArticles = [
   { id: 1, title: 'How do I track my order?', category: 'Orders', views: 1247 },
-  { id: 6, title: 'How do I return an item?', category: 'Returns', views: 2341 },
+  { id: 6, title: 'How do I exchange an item?', category: 'Exchanges', views: 2341 },
   { id: 26, title: 'How do I earn loyalty points?', category: 'Loyalty', views: 2134 },
   { id: 21, title: 'When will items be back in stock?', category: 'Products', views: 1987 },
-  { id: 7, title: 'What is your return policy?', category: 'Returns', views: 1876 }
+  { id: 7, title: 'What is your exchange policy?', category: 'Exchanges', views: 1876 }
 ];
 
 export default function HelpCenterPage() {
@@ -256,9 +256,9 @@ export default function HelpCenterPage() {
               <div className="w-16 h-16 flex items-center justify-center bg-purple-100 rounded-full mx-auto mb-4">
                 <i className="ri-arrow-left-right-line text-3xl text-purple-700"></i>
               </div>
-              <h3 className="text-lg font-bold text-gray-900 mb-2">Start a Return</h3>
-              <p className="text-gray-600 text-sm mb-4">Return or exchange your item</p>
-              <span className="text-purple-700 font-semibold whitespace-nowrap">Initiate Return →</span>
+              <h3 className="text-lg font-bold text-gray-900 mb-2">Start an Exchange</h3>
+              <p className="text-gray-600 text-sm mb-4">Exchange your item (within 24 hours, no refunds)</p>
+              <span className="text-purple-700 font-semibold whitespace-nowrap">Initiate Exchange →</span>
             </Link>
 
             <Link

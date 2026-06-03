@@ -11,8 +11,7 @@ import { usePageTitle } from '@/hooks/usePageTitle';
 
 export default function CartPage() {
   usePageTitle('Shopping Cart');
-  const { cart: cartItems, removeFromCart, updateQuantity, subtotal, addToCart } = useCart();
-  const [appliedCoupon, setAppliedCoupon] = useState<any>(null);
+  const { cart: cartItems, removeFromCart, updateQuantity, subtotal, addToCart, appliedCoupon, applyCoupon, removeCoupon, couponDiscount } = useCart();
   const [savedItems, setSavedItems] = useState<any[]>([]);
 
   // Function to move item to saved for later (local state only for now)
@@ -33,26 +32,9 @@ export default function CartPage() {
     }
   };
 
-  const applyCoupon = (coupon: any) => {
-    setAppliedCoupon(coupon);
-  };
-
-  const removeCoupon = () => {
-    setAppliedCoupon(null);
-  };
-
   // Savings calculation is tricky without originalPrice in Context.
   // Assuming 0 for now unless we update Context.
   const savings = 0;
-
-  let couponDiscount = 0;
-  if (appliedCoupon) {
-    if (appliedCoupon.type === 'percentage') {
-      couponDiscount = subtotal * (appliedCoupon.discount / 100);
-    } else {
-      couponDiscount = appliedCoupon.discount;
-    }
-  }
 
   const shipping = subtotal >= 200 ? 0 : 15;
   const total = subtotal - couponDiscount + shipping;

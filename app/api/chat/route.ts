@@ -52,6 +52,8 @@ interface ChatAction {
   orderNumber?: string;
   couponCode?: string;
   label?: string;
+  autoAdd?: boolean;
+  quantity?: number;
   paymentUrl?: string;
 }
 
@@ -190,7 +192,7 @@ const LLM_TOOLS = [
     type: 'function' as const,
     function: {
       name: 'initiate_return',
-      description: 'Start a return request for a delivered order. Only for logged-in users with a delivered order within 30 days. Ask for the order ID and reason before calling.',
+      description: 'Start an EXCHANGE request for an order. We do NOT offer refunds — exchanges only. Only for logged-in users, and only within 24 hours of purchase. Ask for the order ID and reason before calling.',
       parameters: {
         type: 'object',
         properties: {
@@ -199,6 +201,21 @@ const LLM_TOOLS = [
           description: { type: 'string', description: 'Additional details about the return' },
         },
         required: ['order_id', 'reason'],
+      },
+    },
+  },
+  {
+    type: 'function' as const,
+    function: {
+      name: 'add_to_cart',
+      description: 'Add a product directly to the customer\'s shopping cart. Use this when the customer explicitly asks to add an item to their cart (e.g. "add the red dress to my cart", "add 2 of those"), OR when the customer agrees to a product you suggested. Identify the product by its slug/id (preferred, from a previous search/recommendation) or by name. The item will be added to the cart immediately and the cart will open.',
+      parameters: {
+        type: 'object',
+        properties: {
+          slug_or_id: { type: 'string', description: 'Product slug or UUID (preferred — use the slug from a previous search or recommendation result)' },
+          product_name: { type: 'string', description: 'Product name to search for, if the slug/id is not known' },
+          quantity: { type: 'number', description: 'Quantity to add (default 1)' },
+        },
       },
     },
   },
@@ -343,25 +360,31 @@ WHEN CREATING SUPPORT TICKETS:
 - Always include a clear subject and description based on the full conversation context.
 
 STORE POLICIES (quick reference):
-- Delivery: 1-3 days Accra, 3-7 days rest of Ghana
-- Returns: Within 30 days of delivery, unused items in original packaging
+- Delivery: Order before 10am → delivered same day. Order after 10am → delivered next day.
+- Returns: NO REFUNDS. Exchanges only, and the exchange must be requested within 24 hours of purchase. Items must be unused and in original packaging.
 - Payment: Mobile Money (MTN, Vodafone, AirtelTigo), Cash on Delivery (Accra only)
 - Support hours: Mon-Sat, 8 AM - 8 PM GMT
 
 CAPABILITIES (what you CAN do):
 - Search and recommend products
+- Add products directly to the customer's cart using the add_to_cart tool
 - Check product availability and pricing
 - Track orders by order number + email
 - Show recent orders (logged-in users)
 - Validate coupon/discount codes
 - Create support tickets (for issues that need human help)
-- Initiate returns (logged-in users, delivered orders within 30 days)
-- Answer questions about shipping, returns, payment, and store info
+- Initiate exchanges (logged-in users, within 24 hours of purchase — no refunds, exchanges only)
+- Answer questions about shipping, exchanges, payment, and store info
 - Look up ANY information about the website, business, policies, FAQs, and more using the get_website_info tool
 - **Place orders and initiate payments** using the create_order tool
 
 IMPORTANT — USING WEBSITE KNOWLEDGE:
 When a customer asks about ANYTHING related to the business (policies, how to do something, contact info, account help, delivery zones, payment methods, returns process, FAQs, etc.), ALWAYS use the get_website_info tool first to get accurate, up-to-date information from the actual website. Do NOT rely solely on the quick reference above — use the tool for detailed answers.
+
+ADDING TO CART:
+- When the customer asks to add an item to their cart (e.g. "add the blue dress", "add 2 of those"), call the add_to_cart tool with the product slug/id (from a previous search or recommendation) or the product name, plus the quantity.
+- When you recommend or suggest a product and the customer agrees (e.g. "yes add it", "sounds good", "I'll take it"), call the add_to_cart tool to add it for them.
+- After adding, briefly confirm what you added and ask if they want to checkout or keep shopping. Do NOT ask them to click a button — the item is already added.
 
 CHECKOUT & ORDER PLACEMENT:
 You can help customers place orders directly in this chat. Here is how:
@@ -372,8 +395,8 @@ You can help customers place orders directly in this chat. Here is how:
    - Phone number
    - Delivery address, city, and region
 3. Ask them to choose a delivery method:
-   - **Standard** — GH₵20 (1-3 business days in Accra, 3-7 days outside)
-   - **Express** — GH₵40 (same-day/next-day in Accra)
+   - **Standard** — GH₵20 (order before 10am for same-day delivery, after 10am for next-day delivery)
+   - **Express** — GH₵40 (priority same-day in Accra & Kumasi)
    - **Pickup** — Free (collect from our location)
 4. Ask them to choose a payment method:
    - **Mobile Money** (MTN, Vodafone, AirtelTigo via Moolre) — default
@@ -859,6 +882,7 @@ async function handleWithAI(
   let couponCard: ChatCoupon | undefined;
   let quickReplies: string[] = [];
   let paymentAction: ChatAction | undefined;
+  const cartAdditions: { product: ChatProduct; quantity: number }[] = [];
 
   try {
     const res = await fetchWithRetry(LLM_API_URL, {
@@ -905,6 +929,7 @@ async function handleWithAI(
         if (toolResult.couponCard) couponCard = toolResult.couponCard;
         if (toolResult.quickReplies) quickReplies = toolResult.quickReplies;
         if (toolResult.paymentAction) paymentAction = toolResult.paymentAction;
+        if (toolResult.cartAdditions) cartAdditions.push(...toolResult.cartAdditions);
 
         llmMessages.push({
           role: 'tool',
@@ -960,6 +985,10 @@ async function handleWithAI(
     }
 
     allActions = allProducts.filter((p) => p.inStock).map((p) => ({ type: 'add_to_cart' as const, product: p }));
+    // Auto-add items the AI explicitly added to the cart via the add_to_cart tool
+    for (const add of cartAdditions) {
+      allActions.push({ type: 'add_to_cart', product: add.product, quantity: add.quantity, autoAdd: true });
+    }
     if (paymentAction) allActions.push(paymentAction);
 
     if (!quickReplies.length) {
@@ -1000,6 +1029,7 @@ async function executeToolCall(
   returnCard?: ChatReturn;
   couponCard?: ChatCoupon;
   paymentAction?: ChatAction;
+  cartAdditions?: { product: ChatProduct; quantity: number }[];
   quickReplies?: string[];
 }> {
   switch (fnName) {
@@ -1017,6 +1047,36 @@ async function executeToolCall(
       return {
         data: product ? { name: product.name, price: product.price, inStock: product.inStock } : { error: 'Product not found' },
         products: product ? [product] : undefined,
+      };
+    }
+
+    case 'add_to_cart': {
+      let product: ChatProduct | null = null;
+      if (args.slug_or_id) {
+        product = await getProductForCart(supabase, args.slug_or_id);
+      }
+      if (!product && args.product_name) {
+        const matches = await searchProducts(supabase, args.product_name, 1);
+        product = matches[0] || null;
+      }
+      if (!product) {
+        return {
+          data: { error: 'Could not find that product to add to the cart. Please be more specific or search for it first.' },
+          quickReplies: ['Find a product', 'What do you recommend?'],
+        };
+      }
+      if (!product.inStock) {
+        return {
+          data: { error: `${product.name} is currently out of stock.`, name: product.name },
+          products: [product],
+          quickReplies: ['Show similar items'],
+        };
+      }
+      const qty = Math.max(1, Number(args.quantity) || 1);
+      return {
+        data: { success: true, added: product.name, price: product.price, quantity: qty },
+        cartAdditions: [{ product, quantity: qty }],
+        quickReplies: ['Checkout', 'Continue shopping', 'View cart'],
       };
     }
 

@@ -225,6 +225,7 @@ export default function POSPage() {
     const [holdNote, setHoldNote] = useState('');
     const [isFullscreen, setIsFullscreen] = useState(false);
     const [orderDiscount, setOrderDiscount] = useState(0);
+    const [orderDiscountType, setOrderDiscountType] = useState<'percent' | 'amount'>('percent');
     const [showDiscountInput, setShowDiscountInput] = useState(false);
     const [dailySummary, setDailySummary] = useState<DailySummary | null>(null);
     const [showDailySummary, setShowDailySummary] = useState(false);
@@ -232,6 +233,20 @@ export default function POSPage() {
     const [cashierName, setCashierName] = useState('');
     const [showShortcuts, setShowShortcuts] = useState(false);
     const [scanFeedback, setScanFeedback] = useState('');
+
+    // Exchange / Top-up / Restock
+    interface ReturnedLine { product_id: string; product_name: string; quantity: number; unit_price: number; restock: boolean; image?: string; }
+    const [showExchangeModal, setShowExchangeModal] = useState(false);
+    const [returnedItems, setReturnedItems] = useState<ReturnedLine[]>([]);
+    const [returnSearch, setReturnSearch] = useState('');
+    // Apply existing store credit toward exchange top-up — deferred (not in original feature list)
+    // const [useStoreCredit, setUseStoreCredit] = useState(false);
+    // const [exchangeCustomerCredit, setExchangeCustomerCredit] = useState(0);
+    const [exchangePayment, setExchangePayment] = useState('cash');
+    const [exchangeProcessing, setExchangeProcessing] = useState(false);
+    const [exchangeError, setExchangeError] = useState<string | null>(null);
+    const [exchangeResult, setExchangeResult] = useState<any>(null);
+    const [originalOrderNumber, setOriginalOrderNumber] = useState('');
 
     const searchInputRef = useRef<HTMLInputElement>(null);
     const barcodeBuffer = useRef('');
@@ -572,10 +587,129 @@ export default function POSPage() {
         if (item.discount > 0) return sum + (item.price * item.cartQuantity * item.discount / 100);
         return sum;
     }, 0);
-    const orderDiscountAmount = (cartSubtotal - itemDiscounts) * orderDiscount / 100;
-    const totalDiscount = itemDiscounts + orderDiscountAmount;
+    const baseAfterItemDiscounts = cartSubtotal - itemDiscounts;
+    const orderDiscountAmount = orderDiscountType === 'percent'
+        ? baseAfterItemDiscounts * orderDiscount / 100
+        : Math.min(orderDiscount, baseAfterItemDiscounts);
+    const totalDiscount = itemDiscounts + Math.max(0, orderDiscountAmount);
     const grandTotal = cartSubtotal - totalDiscount;
     const changeDue = amountTendered ? (parseFloat(amountTendered) - grandTotal) : 0;
+
+    // ─── Exchange computed ──────────────────────────────────────────────────
+    const round2 = (n: number) => Math.max(0, Math.round((Number(n) || 0) * 100) / 100);
+    const returnedValue = round2(returnedItems.reduce((s, it) => s + it.unit_price * it.quantity, 0));
+    const exchangeNewValue = grandTotal; // current cart = new items the customer takes
+    const creditFromReturn = Math.min(returnedValue, exchangeNewValue);
+    let exchangeRemaining = round2(exchangeNewValue - creditFromReturn);
+    const exchangeCreditApplied = 0; // deferred: apply banked store credit toward top-up
+    // const exchangeCreditApplied = (useStoreCredit && exchangeCustomerCredit > 0)
+    //     ? Math.min(exchangeCustomerCredit, exchangeRemaining) : 0;
+    // exchangeRemaining = round2(exchangeRemaining - exchangeCreditApplied);
+    const exchangeTopup = exchangeRemaining;
+    const exchangeCreditIssued = round2(returnedValue - exchangeNewValue);
+
+    const returnSearchResults = useMemo(() => {
+        if (!returnSearch.trim()) return [];
+        const q = returnSearch.toLowerCase();
+        return products.filter(p =>
+            p.name.toLowerCase().includes(q) || p.sku?.toLowerCase().includes(q)
+        ).slice(0, 8);
+    }, [products, returnSearch]);
+
+    const addReturnedItem = (product: Product) => {
+        setReturnedItems(prev => {
+            const existing = prev.find(r => r.product_id === product.id);
+            if (existing) {
+                return prev.map(r => r.product_id === product.id ? { ...r, quantity: r.quantity + 1 } : r);
+            }
+            return [...prev, { product_id: product.id, product_name: product.name, quantity: 1, unit_price: product.price, restock: true, image: product.image }];
+        });
+        setReturnSearch('');
+    };
+
+    const updateReturnedItem = (productId: string, patch: Partial<ReturnedLine>) => {
+        setReturnedItems(prev => prev.map(r => r.product_id === productId ? { ...r, ...patch } : r));
+    };
+
+    const removeReturnedItem = (productId: string) => {
+        setReturnedItems(prev => prev.filter(r => r.product_id !== productId));
+    };
+
+    const openExchangeModal = () => {
+        setExchangeError(null);
+        setExchangeResult(null);
+        setShowExchangeModal(true);
+    };
+
+    // deferred: fetch customer store_credit balance for "apply credit" checkbox
+    // useEffect(() => {
+    //     if (!showExchangeModal) return;
+    //     const cust = selectedCustomer;
+    //     if (!cust?.id) { setExchangeCustomerCredit(0); return; }
+    //     supabase.from('customers').select('store_credit').eq('id', cust.id).single()
+    //         .then(({ data }) => setExchangeCustomerCredit(Number(data?.store_credit) || 0));
+    // }, [showExchangeModal, selectedCustomer]);
+
+    const handleExchange = async () => {
+        if (returnedItems.length === 0) { setExchangeError('Add at least one returned item.'); return; }
+        if (exchangeTopup > 0 && (exchangePayment === 'cash' || exchangePayment === 'card')) {
+            // ok, cash/card collected at counter
+        }
+        setExchangeProcessing(true);
+        setExchangeError(null);
+        try {
+            const { data: { session } } = await supabase.auth.getSession();
+            const newItemsPayload = cart.map(item => ({
+                product_id: item.id,
+                product_name: item.name,
+                variant_name: item.variant || null,
+                quantity: item.cartQuantity,
+                unit_price: item.price,
+                total_price: item.price * item.cartQuantity * (1 - (item.discount || 0) / 100),
+                metadata: { image: item.image, exchange: true, discount_pct: item.discount || 0 },
+            }));
+
+            const customerPayload = selectedCustomer ? {
+                id: selectedCustomer.id, email: selectedCustomer.email,
+                phone: selectedCustomer.phone, full_name: selectedCustomer.full_name,
+            } : (guestDetails.firstName || guestDetails.phone || guestDetails.email) ? {
+                email: guestDetails.email || null,
+                phone: guestDetails.phone || null,
+                full_name: `${guestDetails.firstName} ${guestDetails.lastName}`.trim() || null,
+            } : null;
+
+            const res = await fetch('/api/admin/pos/exchange', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', ...(session?.access_token && { Authorization: `Bearer ${session.access_token}` }) },
+                credentials: 'include',
+                body: JSON.stringify({
+                    returnedItems,
+                    newItems: newItemsPayload,
+                    customer: customerPayload,
+                    channel: 'pos',
+                    original_order_number: originalOrderNumber || null,
+                    payment_method: exchangePayment,
+                    // use_store_credit: useStoreCredit, // deferred
+                    cashier: cashierName || null,
+                }),
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Exchange failed');
+            setExchangeResult(data.summary);
+            playSound('success');
+            // Reset cart + returns; refresh stock
+            setCart([]);
+            setOrderDiscount(0);
+            setReturnedItems([]);
+            fetchData();
+            fetchDailySummary();
+        } catch (err: any) {
+            setExchangeError(err.message);
+            playSound('error');
+        } finally {
+            setExchangeProcessing(false);
+        }
+    };
 
     // ─── Order Helpers ──────────────────────────────────────────────────────
 
@@ -854,6 +988,15 @@ export default function POSPage() {
                             )}
 
                             <button
+                                onClick={openExchangeModal}
+                                className="px-3 py-2.5 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-lg hover:bg-indigo-100 transition-colors text-sm font-medium flex items-center"
+                                title="Exchange / Return"
+                            >
+                                <i className="ri-arrow-left-right-line mr-1" />
+                                <span className="hidden sm:inline">Exchange</span>
+                            </button>
+
+                            <button
                                 onClick={() => setShowDailySummary(true)}
                                 className="px-3 py-2.5 bg-gray-50 text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-100 transition-colors text-sm font-medium hidden sm:flex items-center"
                                 title="Today's Sales"
@@ -1101,25 +1244,48 @@ export default function POSPage() {
                     {cart.length > 0 && (
                         <div className="flex gap-2">
                             {showDiscountInput ? (
-                                <div className="flex items-center gap-2 flex-1">
+                                <div className="flex items-center gap-2 flex-1 flex-wrap">
+                                    <div className="flex rounded-lg border border-gray-300 overflow-hidden">
+                                        <button
+                                            type="button"
+                                            onClick={() => setOrderDiscountType('percent')}
+                                            className={`px-2.5 py-1.5 text-xs font-semibold transition-colors ${
+                                                orderDiscountType === 'percent' ? 'bg-gray-900 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'
+                                            }`}
+                                        >%</button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setOrderDiscountType('amount')}
+                                            className={`px-2.5 py-1.5 text-xs font-semibold transition-colors ${
+                                                orderDiscountType === 'amount' ? 'bg-gray-900 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'
+                                            }`}
+                                        >GH₵</button>
+                                    </div>
                                     <input
                                         type="number"
+                                        min="0"
+                                        step={orderDiscountType === 'amount' ? '0.01' : '1'}
                                         value={orderDiscount || ''}
-                                        onChange={e => setOrderDiscount(Math.min(100, Math.max(0, Number(e.target.value))))}
+                                        onChange={e => {
+                                            const v = Math.max(0, Number(e.target.value));
+                                            setOrderDiscount(orderDiscountType === 'percent' ? Math.min(100, v) : v);
+                                        }}
                                         placeholder="0"
-                                        className="w-16 px-2 py-1.5 border border-gray-300 rounded-lg text-sm text-center"
+                                        className="w-20 px-2 py-1.5 border border-gray-300 rounded-lg text-sm text-center"
                                         autoFocus
                                     />
-                                    <span className="text-xs text-gray-500">% off order</span>
-                                    <button onClick={() => setShowDiscountInput(false)} className="text-xs text-gray-700 font-medium">Done</button>
+                                    <span className="text-xs text-gray-500">{orderDiscountType === 'percent' ? '% off order' : 'GH₵ off order'}</span>
+                                    <button onClick={() => setShowDiscountInput(false)} className="text-xs text-gray-700 font-medium ml-auto">Done</button>
                                 </div>
                             ) : (
                                 <button
                                     onClick={() => setShowDiscountInput(true)}
                                     className="text-xs px-3 py-1.5 bg-white border border-gray-200 text-gray-600 rounded-lg hover:bg-gray-50 font-medium"
                                 >
-                                    <i className="ri-percent-line mr-1" />
-                                    {orderDiscount > 0 ? `${orderDiscount}% Discount` : 'Add Discount'}
+                                    <i className="ri-coupon-3-line mr-1" />
+                                    {orderDiscount > 0
+                                        ? (orderDiscountType === 'percent' ? `${orderDiscount}% Discount` : `GH₵${orderDiscount.toFixed(2)} Discount`)
+                                        : 'Add Discount'}
                                 </button>
                             )}
                         </div>
@@ -1463,6 +1629,232 @@ export default function POSPage() {
                                 ))
                             )}
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ─── Exchange Modal ────────────────────────────────────────────── */}
+            {showExchangeModal && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                    <div className="bg-white rounded-2xl w-full max-w-2xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh]">
+                        <div className="p-5 border-b border-gray-100 flex justify-between items-center bg-indigo-50 shrink-0">
+                            <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                                <i className="ri-arrow-left-right-line text-indigo-600" /> Exchange / Return
+                            </h3>
+                            <button onClick={() => setShowExchangeModal(false)} className="w-8 h-8 rounded-full hover:bg-white/60 flex items-center justify-center text-gray-500">
+                                <i className="ri-close-line text-xl" />
+                            </button>
+                        </div>
+
+                        {exchangeResult ? (
+                            <div className="p-8 text-center space-y-5 overflow-y-auto">
+                                <div className="w-20 h-20 mx-auto rounded-full bg-green-100 flex items-center justify-center">
+                                    <i className="ri-checkbox-circle-fill text-5xl text-green-600" />
+                                </div>
+                                <h2 className="text-2xl font-bold text-gray-900">Exchange Completed</h2>
+                                <div className="bg-gray-50 rounded-xl p-5 text-left max-w-sm mx-auto space-y-2 text-sm">
+                                    <div className="flex justify-between"><span className="text-gray-600">Returned value</span><span className="font-semibold">GH₵{exchangeResult.returnedValue.toFixed(2)}</span></div>
+                                    <div className="flex justify-between"><span className="text-gray-600">New items value</span><span className="font-semibold">GH₵{exchangeResult.newItemsValue.toFixed(2)}</span></div>
+                                    {/* deferred: exchangeResult.storeCreditUsed */}
+                                    <div className="flex justify-between text-lg font-bold pt-2 border-t border-gray-200">
+                                        <span>{exchangeResult.topupAmount > 0 ? 'Customer pays' : 'Balanced'}</span>
+                                        <span className="text-gray-900">GH₵{exchangeResult.topupAmount.toFixed(2)}</span>
+                                    </div>
+                                    {exchangeResult.creditIssued > 0 && (
+                                        <div className="flex justify-between text-green-700 font-semibold pt-1">
+                                            <span>Store credit issued</span><span>GH₵{exchangeResult.creditIssued.toFixed(2)}</span>
+                                        </div>
+                                    )}
+                                    <div className="flex justify-between text-xs text-gray-500 pt-1">
+                                        <span>Items restocked</span>
+                                        <span>{exchangeResult.restocked.filter((r: any) => r.restocked).length} of {exchangeResult.restocked.length}</span>
+                                    </div>
+                                    {exchangeResult.newStoreCreditBalance > 0 && (
+                                        <div className="flex justify-between text-xs text-gray-500">
+                                            <span>Customer credit balance</span><span>GH₵{exchangeResult.newStoreCreditBalance.toFixed(2)}</span>
+                                        </div>
+                                    )}
+                                </div>
+                                <button onClick={() => { setShowExchangeModal(false); setExchangeResult(null); }}
+                                    className="px-8 py-3 bg-gray-900 text-white rounded-xl font-semibold hover:bg-gray-800 transition-colors">Done</button>
+                            </div>
+                        ) : (
+                            <>
+                                <div className="p-5 space-y-5 overflow-y-auto">
+                                    <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-3 text-sm text-indigo-800">
+                                        <i className="ri-information-line mr-1" />
+                                        Add the items being <strong>returned</strong> below. Put the items the customer is <strong>taking instead</strong> into the main cart. The returned value is credited toward the new items; any difference is topped up (or banked as store credit).
+                                    </div>
+
+                                    {exchangeError && (
+                                        <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700 flex items-start gap-2">
+                                            <i className="ri-error-warning-line mt-0.5" />{exchangeError}
+                                        </div>
+                                    )}
+
+                                    {/* Original order ref */}
+                                    <div>
+                                        <label className="block text-sm font-semibold text-gray-700 mb-1.5">Original Order # <span className="text-gray-400 font-normal">— optional</span></label>
+                                        <input type="text" value={originalOrderNumber} onChange={e => setOriginalOrderNumber(e.target.value)}
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500"
+                                            placeholder="ORD-..." />
+                                    </div>
+
+                                    {/* Returned items */}
+                                    <div>
+                                        <label className="block text-sm font-semibold text-gray-700 mb-2">Items Being Returned</label>
+                                        <div className="relative mb-2">
+                                            <i className="ri-search-line absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm" />
+                                            <input type="text" value={returnSearch} onChange={e => setReturnSearch(e.target.value)}
+                                                className="w-full pl-9 pr-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500"
+                                                placeholder="Search a product to add as returned..." />
+                                            {returnSearchResults.length > 0 && (
+                                                <div className="absolute z-10 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-y-auto">
+                                                    {returnSearchResults.map(p => (
+                                                        <button key={p.id} onClick={() => addReturnedItem(p)}
+                                                            className="w-full flex items-center gap-3 px-3 py-2 hover:bg-gray-50 text-left">
+                                                            <div className="w-9 h-9 rounded bg-gray-100 overflow-hidden flex-shrink-0">
+                                                                {p.image ? <img src={p.image} className="w-full h-full object-cover" alt="" /> : <i className="ri-image-line text-gray-300 flex items-center justify-center h-full" />}
+                                                            </div>
+                                                            <span className="flex-1 text-sm text-gray-800">{p.name}</span>
+                                                            <span className="text-sm font-semibold text-gray-900">GH₵{p.price.toFixed(2)}</span>
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {returnedItems.length === 0 ? (
+                                            <div className="text-center py-6 text-gray-400 text-sm border border-dashed border-gray-200 rounded-lg">
+                                                No returned items yet
+                                            </div>
+                                        ) : (
+                                            <div className="space-y-2">
+                                                {returnedItems.map(r => (
+                                                    <div key={r.product_id} className="flex items-center gap-2 p-2.5 bg-gray-50 rounded-lg">
+                                                        <div className="flex-1 min-w-0">
+                                                            <p className="text-sm font-semibold text-gray-900 line-clamp-1">{r.product_name}</p>
+                                                            <label className="text-[11px] text-gray-500 flex items-center gap-1 mt-0.5">
+                                                                <input type="checkbox" checked={r.restock}
+                                                                    onChange={e => updateReturnedItem(r.product_id, { restock: e.target.checked })} />
+                                                                Restock to inventory
+                                                            </label>
+                                                        </div>
+                                                        <div className="flex items-center gap-1">
+                                                            <span className="text-xs text-gray-400">Qty</span>
+                                                            <input type="number" min="1" value={r.quantity}
+                                                                onChange={e => updateReturnedItem(r.product_id, { quantity: Math.max(1, Number(e.target.value)) })}
+                                                                className="w-14 px-2 py-1 border border-gray-300 rounded text-sm text-center" />
+                                                        </div>
+                                                        <div className="flex items-center gap-1">
+                                                            <span className="text-xs text-gray-400">GH₵</span>
+                                                            <input type="number" min="0" step="0.01" value={r.unit_price}
+                                                                onChange={e => updateReturnedItem(r.product_id, { unit_price: Math.max(0, Number(e.target.value)) })}
+                                                                className="w-20 px-2 py-1 border border-gray-300 rounded text-sm text-center" />
+                                                        </div>
+                                                        <button onClick={() => removeReturnedItem(r.product_id)} className="text-gray-400 hover:text-red-500 p-1">
+                                                            <i className="ri-close-line" />
+                                                        </button>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* New items summary */}
+                                    <div>
+                                        <label className="block text-sm font-semibold text-gray-700 mb-2">New Items (from cart)</label>
+                                        {cart.length === 0 ? (
+                                            <div className="text-center py-4 text-gray-400 text-sm border border-dashed border-gray-200 rounded-lg">
+                                                Cart is empty — customer is only returning (store credit will be issued)
+                                            </div>
+                                        ) : (
+                                            <div className="bg-gray-50 rounded-lg p-3 space-y-1 text-sm">
+                                                {cart.map(i => (
+                                                    <div key={i.id} className="flex justify-between text-gray-700">
+                                                        <span className="truncate pr-2">{i.name} ×{i.cartQuantity}</span>
+                                                        <span className="font-medium">GH₵{(i.price * i.cartQuantity * (1 - i.discount / 100)).toFixed(2)}</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Customer */}
+                                    <div>
+                                        <label className="block text-sm font-semibold text-gray-700 mb-2">Customer <span className="text-gray-400 font-normal">— needed to bank store credit</span></label>
+                                        <select className="w-full p-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500"
+                                            onChange={(e) => setSelectedCustomer(customers.find(c => c.id === e.target.value) || null)}
+                                            value={selectedCustomer?.id || ''}>
+                                            <option value="">Walk-in (no credit account)</option>
+                                            {customers.map(c => (
+                                                <option key={c.id} value={c.id}>{c.full_name || 'No Name'} — {c.phone || c.email}</option>
+                                            ))}
+                                        </select>
+                                        {/* deferred: apply existing store credit toward exchange top-up
+                                        {selectedCustomer && exchangeCustomerCredit > 0 && (
+                                            <label className="mt-2 flex items-center gap-2 text-sm text-indigo-700 bg-indigo-50 rounded-lg p-2.5">
+                                                <input type="checkbox" checked={useStoreCredit} onChange={e => setUseStoreCredit(e.target.checked)} />
+                                                Apply available store credit (GH₵{exchangeCustomerCredit.toFixed(2)})
+                                            </label>
+                                        )}
+                                        */}
+                                    </div>
+
+                                    {/* Math summary */}
+                                    <div className="bg-gray-900 text-white rounded-xl p-4 space-y-1.5 text-sm">
+                                        <div className="flex justify-between text-gray-300"><span>Returned value</span><span>GH₵{returnedValue.toFixed(2)}</span></div>
+                                        <div className="flex justify-between text-gray-300"><span>New items value</span><span>GH₵{exchangeNewValue.toFixed(2)}</span></div>
+                                        {/* deferred: exchangeCreditApplied > 0 line */}
+                                        {exchangeTopup > 0 ? (
+                                            <div className="flex justify-between text-lg font-bold pt-2 border-t border-white/20">
+                                                <span>Customer Tops Up</span><span>GH₵{exchangeTopup.toFixed(2)}</span>
+                                            </div>
+                                        ) : exchangeCreditIssued > 0 ? (
+                                            <div className="flex justify-between text-lg font-bold pt-2 border-t border-white/20 text-green-300">
+                                                <span>Store Credit Issued</span><span>GH₵{exchangeCreditIssued.toFixed(2)}</span>
+                                            </div>
+                                        ) : (
+                                            <div className="flex justify-between text-lg font-bold pt-2 border-t border-white/20">
+                                                <span>Even Exchange</span><span>GH₵0.00</span>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Payment for top-up */}
+                                    {exchangeTopup > 0 && (
+                                        <div>
+                                            <label className="block text-sm font-semibold text-gray-700 mb-2">Top-up Payment Method</label>
+                                            <div className="grid grid-cols-3 gap-2">
+                                                {[
+                                                    { key: 'cash', label: 'Cash', icon: 'ri-money-cny-circle-line' },
+                                                    { key: 'card', label: 'Card', icon: 'ri-bank-card-line' },
+                                                    { key: 'momo', label: 'MoMo', icon: 'ri-smartphone-line' },
+                                                ].map(m => (
+                                                    <button key={m.key} onClick={() => setExchangePayment(m.key)}
+                                                        className={`py-2.5 rounded-lg border text-sm font-medium flex flex-col items-center gap-1 ${
+                                                            exchangePayment === m.key ? 'border-indigo-500 bg-indigo-50 text-indigo-700 ring-1 ring-indigo-500' : 'border-gray-200 text-gray-600 hover:border-gray-300'
+                                                        }`}>
+                                                        <i className={`${m.icon} text-lg`} />{m.label}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+
+                                <div className="p-5 border-t border-gray-100 bg-gray-50 shrink-0">
+                                    <button onClick={handleExchange} disabled={exchangeProcessing || returnedItems.length === 0}
+                                        className="w-full py-4 bg-indigo-600 text-white rounded-xl font-bold text-lg shadow-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2">
+                                        {exchangeProcessing ? (
+                                            <><i className="ri-loader-4-line animate-spin" /><span>Processing...</span></>
+                                        ) : (
+                                            <><i className="ri-arrow-left-right-line" /><span>Complete Exchange</span></>
+                                        )}
+                                    </button>
+                                </div>
+                            </>
+                        )}
                     </div>
                 </div>
             )}

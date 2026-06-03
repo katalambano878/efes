@@ -114,7 +114,7 @@ export default function Home() {
 
   const features = [
     { icon: 'ri-store-2-line', title: 'Free Store Pickup', desc: 'Pick up at our store' },
-    { icon: 'ri-arrow-left-right-line', title: 'Easy Returns', desc: '30-day return policy' },
+    { icon: 'ri-arrow-left-right-line', title: 'Easy Exchanges', desc: '24-hour exchanges, no refunds' },
     { icon: 'ri-customer-service-2-line', title: '24/7 Support', desc: 'Dedicated service' },
     { icon: 'ri-shield-check-line', title: 'Secure Payment', desc: 'Safe checkout' },
   ];

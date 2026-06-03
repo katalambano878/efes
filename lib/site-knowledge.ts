@@ -49,32 +49,30 @@ You can also use the contact form on the website or create a support ticket via 
     title: 'Shipping & Delivery Policy',
     path: '/shipping',
     category: 'shipping',
-    content: `Delivery Options:
-- Standard Delivery: 2-5 Business Days, GH₵20
-- Express Delivery: Next Day, GH₵40 (Available in Accra & Kumasi only)
-- Store Pickup: Same Day, FREE — Order online and pick up at our Accra location
+    content: `Delivery Timing:
+- Order BEFORE 10am → delivered the SAME day
+- Order AFTER 10am → delivered the NEXT day
+The 10am cut-off is the deadline for same-day delivery.
+
+Delivery Options:
+- Standard Delivery: GH₵20
+- Express Delivery: GH₵40 (Available in Accra & Kumasi only)
+- Store Pickup: FREE — Order online and pick up at our Accra location
 
 Free Shipping: On all orders over GH₵300!
 
-Delivery Zones:
-- Zone 1 (Accra Metro): 1-2 days standard, next day express
-- Zone 2 (Greater Accra): 2-3 days standard, next day express
-- Zone 3 (Major Cities like Kumasi, Takoradi, Tamale, Cape Coast): 3-4 days standard, 1-2 days express
-- Zone 4 (Other Areas): 4-5 days standard, express not available
-
 How Delivery Works:
-1. Order Processing — We prepare your order (same day if ordered before 2pm)
+1. Order Processing — Orders placed before 10am are prepared and dispatched for same-day delivery; orders after 10am go out for next-day delivery
 2. Dispatch — Your package is handed to our delivery partner
 3. Track — You get a tracking number via SMS/email
 4. Delivery — Package arrives at your doorstep
 
 Important Details:
-- Cut-off time: Orders placed before 2pm are processed same day
-- Business days: Monday to Friday
+- Cut-off time: Orders placed before 10am are delivered the same day; orders after 10am are delivered the next day
 - We will contact you before delivery
 - Failed deliveries: We attempt delivery twice. After 2 failed attempts, package returns to our warehouse
 - Package security: All items carefully packaged for safe delivery`,
-    keywords: ['shipping', 'delivery', 'how long', 'deliver', 'express', 'standard', 'pickup', 'store pickup', 'free shipping', 'zones', 'accra', 'kumasi', 'tracking', 'days'],
+    keywords: ['shipping', 'delivery', 'how long', 'deliver', 'express', 'standard', 'pickup', 'store pickup', 'free shipping', 'zones', 'accra', 'kumasi', 'tracking', 'days', '10am', 'same day', 'next day', 'cut-off'],
   },
 
   // ─── RETURNS & REFUNDS ──────────────────────────────────────────────────────
@@ -83,36 +81,28 @@ Important Details:
     title: 'Returns & Refunds Policy',
     path: '/returns',
     category: 'returns',
-    content: `Returns Policy:
-- Returns accepted within 30 days of delivery
-- Items must be unused, in original packaging, with tags attached
-- Free return shipping for defective/damaged items
-- Refunds processed within 5-7 business days
+    content: `Returns & Exchange Policy:
+- NO REFUNDS. We do not offer refunds under any circumstances.
+- EXCHANGES ONLY. You can exchange an item for a different size, colour, or product.
+- Exchanges must be requested WITHIN 24 HOURS of purchase. After 24 hours, exchanges are no longer accepted.
+- Items must be unused, in original packaging, with tags attached.
 
-How to Return:
+How to Request an Exchange:
 1. Find your order (use order number and email)
-2. Select items to return and choose a reason
-3. Submit return request — you'll get a prepaid return label via email
+2. Select items to exchange and choose a reason
+3. Submit your exchange request within 24 hours of purchase
 
-Return Reasons We Accept:
+Exchange Reasons We Accept:
 - Wrong size or fit
 - Wrong item received
 - Defective or damaged
 - Not as described
-- Changed my mind
-- Better price elsewhere
-- No longer needed
 
-Options: You can choose either a full Refund or an Exchange
-
-After Submitting:
-- You'll receive an email with: prepaid return label, packing instructions, drop-off locations, and a tracking number
-- Ship the item back within 7 days
-- Keep items unused and with tags
-- Save your tracking number
-
-Refund Timeline: Once we receive and inspect the returned item, refunds are processed within 5-7 business days to your original payment method.`,
-    keywords: ['return', 'refund', 'exchange', 'send back', 'money back', 'damaged', 'defective', 'wrong item', 'wrong size', 'policy'],
+Important:
+- Exchange requests must be made within 24 hours of purchase — this window is strict.
+- We do NOT issue refunds; only exchanges are available.
+- Keep items unused and with original tags.`,
+    keywords: ['return', 'refund', 'exchange', 'send back', 'money back', 'damaged', 'defective', 'wrong item', 'wrong size', 'policy', '24 hours', 'no refund', 'exchange only'],
   },
 
   // ─── PAYMENT ────────────────────────────────────────────────────────────────
@@ -202,7 +192,7 @@ Save items you love to your wishlist (requires account). You can add all wishlis
 
 Product Categories: Browse by category on the shop page.
 
-Trust Features: Free Store Pickup, Easy 30-Day Returns, 24/7 Chat Support, Secure Payment`,
+Trust Features: Free Store Pickup, 24-Hour Exchanges (no refunds), 24/7 Chat Support, Secure Payment`,
     keywords: ['shop', 'buy', 'products', 'browse', 'categories', 'filter', 'sort', 'cart', 'wishlist', 'search', 'how to order', 'add to cart'],
   },
 
@@ -227,8 +217,8 @@ Q: What if I received the wrong item?
 A: Contact us immediately! You can initiate a return through the Returns page or create a support ticket. We'll arrange a free return and send the correct item.
 
 Q: How long does delivery take?
-A: Accra Metro: 1-2 days, Greater Accra: 2-3 days, Major Cities: 3-4 days, Other Areas: 4-5 days. Express delivery (next day) available in Accra and Kumasi for GH₵40.`,
-    keywords: ['faq', 'order', 'place order', 'cancel', 'modify', 'track', 'wrong item', 'how long'],
+A: It depends on the time you order. Order before 10am and your item is delivered the same day. Order after 10am and it's delivered the next day.`,
+    keywords: ['faq', 'order', 'place order', 'cancel', 'modify', 'track', 'wrong item', 'how long', '10am', 'same day', 'next day'],
   },
   {
     id: 'faq-shipping',
@@ -237,11 +227,14 @@ A: Accra Metro: 1-2 days, Greater Accra: 2-3 days, Major Cities: 3-4 days, Other
     category: 'faq',
     content: `Frequently Asked Questions — Shipping:
 
+Q: How fast is delivery?
+A: Order before 10am and we deliver the same day. Order after 10am and we deliver the next day.
+
 Q: What are the delivery costs?
-A: Standard: GH₵20 (2-5 days), Express: GH₵40 (next day, Accra & Kumasi only), Store Pickup: FREE. Orders over GH₵300 get free shipping!
+A: Standard: GH₵20, Express: GH₵40 (Accra & Kumasi only), Store Pickup: FREE. Orders over GH₵300 get free shipping!
 
 Q: Do you deliver nationwide?
-A: Yes! We deliver across all of Ghana. Delivery times vary by zone — Accra is fastest (1-2 days), other areas up to 4-5 days.
+A: Yes! We deliver across all of Ghana.
 
 Q: Do you ship internationally?
 A: Currently we only deliver within Ghana. International shipping is not yet available.
@@ -258,23 +251,23 @@ A: Yes! Store Pickup is FREE. Order online and pick up the same day at our Accra
     title: 'FAQ — Returns & Refunds',
     path: '/faqs',
     category: 'faq',
-    content: `Frequently Asked Questions — Returns:
+    content: `Frequently Asked Questions — Returns & Exchanges:
 
 Q: What is your return policy?
-A: 30 days from delivery. Items must be unused, in original packaging with tags attached.
+A: We do NOT offer refunds. We only accept exchanges, and the exchange must be requested within 24 hours of purchase. Items must be unused, in original packaging with tags attached.
 
-Q: What items cannot be returned?
-A: Perishable goods, intimate apparel, personalized items, digital products, and items marked as final sale.
+Q: Do you give refunds?
+A: No. We do not issue refunds under any circumstances. We only offer exchanges.
 
-Q: Who pays for return shipping?
-A: Free return shipping for defective/damaged items. For other returns, a small return shipping fee may apply.
+Q: How long do I have to request an exchange?
+A: Exchanges are only accepted within 24 hours of purchase. After 24 hours, we can no longer process an exchange.
 
-Q: Can I exchange instead of returning?
-A: Yes! When submitting a return request, you can choose "Exchange" instead of "Refund."
+Q: Can I exchange an item?
+A: Yes — exchanges are the only option we offer. Request your exchange within 24 hours of purchase for a different size, colour, or product.
 
-Q: How long do refunds take?
-A: 5-7 business days after we receive and inspect the returned item. Refunds go back to your original payment method.`,
-    keywords: ['faq', 'return', 'refund', 'exchange', 'non-returnable', 'how long refund'],
+Q: What items cannot be exchanged?
+A: Items that are used, missing tags, or not in original packaging, and any exchange requested more than 24 hours after purchase.`,
+    keywords: ['faq', 'return', 'refund', 'exchange', 'non-returnable', 'how long refund', '24 hours', 'no refund', 'exchange only'],
   },
   {
     id: 'faq-payment',
@@ -293,7 +286,7 @@ Q: Do you offer installment payments?
 A: Currently we don't offer installment/buy-now-pay-later options. Full payment is required at checkout.
 
 Q: How do refunds work?
-A: Refunds are processed within 5-7 business days to your original payment method (Mobile Money account).
+A: We do not offer refunds. If there's an issue with your order, we offer an exchange instead — and the exchange must be requested within 24 hours of purchase.
 
 Q: Can I use a coupon or discount code?
 A: Yes! Enter your coupon code in the cart page. The discount will be applied to your order total.`,
@@ -362,7 +355,7 @@ Products & Pricing: We strive for accuracy but reserve the right to correct erro
 
 Orders: An order confirmation does not guarantee acceptance. We may cancel orders due to stock issues, pricing errors, or suspicious activity.
 
-Returns: 14-day return policy for unused items in original packaging. Refunds processed within 5-7 business days.
+Returns: No refunds. Exchanges only, and the exchange must be requested within 24 hours of purchase. Items must be unused and in original packaging.
 
 Liability: We are not liable for indirect damages. Our total liability is limited to the amount you paid for the product.
 
@@ -381,7 +374,7 @@ Intellectual Property: All content on the website (text, images, logos, designs)
     content: `Help Center Categories:
 
 1. Orders & Delivery (12 articles): How to place orders, track shipments, delivery times, failed deliveries, order modifications
-2. Returns & Refunds (10 articles): Return policy, how to return, refund timelines, exchanges, non-returnable items
+2. Exchanges (no refunds): Exchange-only policy, how to request an exchange, the 24-hour exchange window, non-exchangeable items
 3. Payment & Pricing (8 articles): Payment methods, security, coupon codes, pricing questions, refund processing
 4. Account & Profile (9 articles): Creating account, password reset, profile updates, address management, email changes
 5. Products & Stock (7 articles): Product availability, stock alerts, product quality, specifications, sizing guides
@@ -578,7 +571,7 @@ export function getSiteMapSummary(): string {
 - /cart — Shopping cart with coupon support
 - /checkout — Checkout flow (shipping → delivery → payment)
 - /order-tracking — Track orders by order number + email
-- /returns — Start a return request (30-day policy)
+- /returns — Start an exchange request (no refunds; exchanges within 24 hours of purchase)
 - /account — Profile, order history, addresses, security settings
 - /wishlist — Saved products
 - /about — Store story and mission

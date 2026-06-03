@@ -112,7 +112,7 @@ export default function TermsPage() {
 
             <h3 className="text-xl font-bold text-gray-900 mb-4 mt-8">3.3 Availability</h3>
             <p className="text-gray-600 leading-relaxed">
-              Product availability is subject to change without notice. If an ordered item becomes unavailable, we will notify you and offer a refund or replacement option.
+              Product availability is subject to change without notice. If an ordered item becomes unavailable, we will notify you and arrange a replacement or exchange option.
             </p>
           </section>
 
@@ -182,12 +182,12 @@ export default function TermsPage() {
           </section>
 
           <section className="mb-12">
-            <h2 className="text-3xl font-bold text-gray-900 mb-6">6. Returns & Refunds</h2>
+            <h2 className="text-3xl font-bold text-gray-900 mb-6">6. Exchanges (No Refunds)</h2>
             <p className="text-gray-600 leading-relaxed mb-4">
-              We offer a 14-day return policy for most products. See our Returns Policy for complete details on eligibility, process, and conditions.
+              We do not offer refunds under any circumstances. We only accept exchanges, and any exchange must be requested within 24 hours of purchase. After 24 hours, exchanges can no longer be processed.
             </p>
             <p className="text-gray-600 leading-relaxed">
-              Refunds are processed within 5-7 business days of receiving your return. Refunds are issued to the original payment method.
+              To be eligible for an exchange, items must be unused and in their original packaging with tags attached. See our Exchange Policy for complete details on eligibility, process, and conditions.
             </p>
           </section>
 

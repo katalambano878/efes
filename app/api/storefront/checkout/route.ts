@@ -13,6 +13,8 @@ export async function POST(request: Request) {
       subtotal,
       tax,
       shippingCost,
+      discountTotal,
+      couponCode,
       total,
       deliveryMethod,
       paymentMethod,
@@ -38,7 +40,7 @@ export async function POST(request: Request) {
         subtotal,
         tax_total: tax,
         shipping_total: shippingCost,
-        discount_total: 0,
+        discount_total: discountTotal || 0,
         total,
         shipping_method: deliveryMethod,
         payment_method: paymentMethod,
@@ -49,6 +51,7 @@ export async function POST(request: Request) {
           first_name: shippingData.firstName,
           last_name: shippingData.lastName,
           tracking_number: trackingNumber,
+          coupon_code: couponCode || null,
         },
       }])
       .select()
@@ -128,6 +131,30 @@ export async function POST(request: Request) {
       });
     } catch (e: any) {
       console.warn('upsert_customer_from_order warning:', e.message);
+    }
+
+    // Store credit redemption at checkout — NOT in original scope (deferred).
+    // if (storeCreditUsed > 0 && customerId) {
+    //   deduct from customers.store_credit, add store_credit_transactions row, adjust total
+    // }
+
+    // 4. Increment coupon usage (best-effort)
+    if (couponCode) {
+      try {
+        const { data: coupon } = await supabaseAdmin
+          .from('coupons')
+          .select('id, usage_count')
+          .ilike('code', String(couponCode).trim())
+          .single();
+        if (coupon) {
+          await supabaseAdmin
+            .from('coupons')
+            .update({ usage_count: (coupon.usage_count || 0) + 1 })
+            .eq('id', coupon.id);
+        }
+      } catch (e: any) {
+        console.warn('coupon usage increment warning:', e.message);
+      }
     }
 
     return NextResponse.json({ order });

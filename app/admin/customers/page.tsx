@@ -12,10 +12,78 @@ export default function AdminCustomersPage() {
   const [sortOption, setSortOption] = useState('Sort by Join Date');
   const [filterStatus, setFilterStatus] = useState('All Customers');
 
+  // Add customer modal
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [addForm, setAddForm] = useState({ fullName: '', phone: '', email: '' });
+  const [addSaving, setAddSaving] = useState(false);
+  const [addError, setAddError] = useState('');
+  const [addSuccess, setAddSuccess] = useState('');
+
   useEffect(() => {
     fetchCustomers();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- run once on mount
   }, []);
+
+  const handleAddCustomer = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAddError('');
+    setAddSuccess('');
+
+    const fullName = addForm.fullName.trim();
+    const phoneRaw = addForm.phone.trim();
+    const emailRaw = addForm.email.trim().toLowerCase();
+
+    if (!phoneRaw && !emailRaw) {
+      setAddError('Enter at least a phone number or email.');
+      return;
+    }
+
+    const digits = phoneRaw.replace(/\D/g, '');
+    // customers.email is NOT NULL + UNIQUE — synthesize one from the phone when missing
+    const email = emailRaw || (digits ? `${digits}@manual.local` : `manual-${Date.now()}@manual.local`);
+    const nameParts = fullName.split(' ');
+
+    setAddSaving(true);
+    const { error } = await supabase.from('customers').insert([{
+      email,
+      phone: phoneRaw || null,
+      full_name: fullName || null,
+      first_name: nameParts[0] || null,
+      last_name: nameParts.slice(1).join(' ') || null,
+      tags: ['imported'],
+    }]);
+    setAddSaving(false);
+
+    if (error) {
+      if (error.code === '23505') {
+        setAddError('A customer with this phone/email already exists.');
+      } else {
+        setAddError(error.message);
+      }
+      return;
+    }
+
+    setAddSuccess(`${fullName || phoneRaw || email} added.`);
+    setAddForm({ fullName: '', phone: '', email: '' });
+    fetchCustomers();
+  };
+
+  const handleExport = () => {
+    const rows = filteredCustomers.length > 0 ? filteredCustomers : customers;
+    const header = ['Name', 'Phone', 'Email', 'Orders', 'Total Spent', 'Status', 'Joined'];
+    const escape = (v: any) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+    const csv = [
+      header.join(','),
+      ...rows.map(c => [c.name, c.phone, c.email, c.orders, c.totalSpent, c.status, c.joined].map(escape).join(',')),
+    ].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `customers-${new Date().toISOString().slice(0, 10)}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
 
   const fetchCustomers = async () => {
     try {
@@ -280,10 +348,22 @@ export default function AdminCustomersPage() {
           <h1 className="text-3xl font-bold text-gray-900">Customers</h1>
           <p className="text-gray-600 mt-1">Manage your customer base and relationships</p>
         </div>
-        <button className="bg-gray-900 hover:bg-gray-800 text-white px-6 py-3 rounded-lg font-semibold transition-colors whitespace-nowrap cursor-pointer">
-          <i className="ri-download-line mr-2"></i>
-          Export Customers
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={handleExport}
+            className="bg-white border-2 border-gray-200 hover:bg-gray-50 text-gray-800 px-5 py-3 rounded-lg font-semibold transition-colors whitespace-nowrap cursor-pointer"
+          >
+            <i className="ri-download-line mr-2"></i>
+            Export Customers
+          </button>
+          <button
+            onClick={() => { setShowAddModal(true); setAddError(''); setAddSuccess(''); }}
+            className="bg-gray-900 hover:bg-gray-800 text-white px-6 py-3 rounded-lg font-semibold transition-colors whitespace-nowrap cursor-pointer"
+          >
+            <i className="ri-user-add-line mr-2"></i>
+            Add Customer
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -468,6 +548,95 @@ export default function AdminCustomersPage() {
           </div>
         </div>
       </div>
+
+      {/* Add Customer Modal */}
+      {showAddModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setShowAddModal(false)} />
+          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md">
+            <div className="p-6 border-b border-gray-100 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-gray-100 rounded-xl flex items-center justify-center">
+                  <i className="ri-user-add-line text-xl text-gray-700" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold text-gray-900">Add Customer</h2>
+                  <p className="text-xs text-gray-500">Add a past client to your contacts for SMS/marketing</p>
+                </div>
+              </div>
+              <button onClick={() => setShowAddModal(false)} className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg cursor-pointer">
+                <i className="ri-close-line text-xl" />
+              </button>
+            </div>
+
+            <form onSubmit={handleAddCustomer} className="p-6 space-y-4">
+              {addError && (
+                <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700 flex items-center gap-2">
+                  <i className="ri-error-warning-line text-lg" />
+                  {addError}
+                </div>
+              )}
+              {addSuccess && (
+                <div className="p-3 bg-green-50 border border-green-200 rounded-xl text-sm text-green-700 flex items-center gap-2">
+                  <i className="ri-check-line text-lg" />
+                  {addSuccess}
+                </div>
+              )}
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1.5">Full Name</label>
+                <input
+                  type="text"
+                  value={addForm.fullName}
+                  onChange={e => setAddForm(f => ({ ...f, fullName: e.target.value }))}
+                  placeholder="e.g. Ama Mensah"
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-gray-600 focus:border-gray-600 outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1.5">Phone Number</label>
+                <input
+                  type="tel"
+                  value={addForm.phone}
+                  onChange={e => setAddForm(f => ({ ...f, phone: e.target.value }))}
+                  placeholder="e.g. 0551234567"
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-gray-600 focus:border-gray-600 outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1.5">Email <span className="text-gray-400 font-normal">(optional)</span></label>
+                <input
+                  type="email"
+                  value={addForm.email}
+                  onChange={e => setAddForm(f => ({ ...f, email: e.target.value }))}
+                  placeholder="optional@example.com"
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-gray-600 focus:border-gray-600 outline-none"
+                />
+                <p className="text-xs text-gray-400 mt-1">Provide a phone number or email (at least one).</p>
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowAddModal(false)}
+                  className="flex-1 px-4 py-2.5 border border-gray-300 text-gray-700 font-medium rounded-xl hover:bg-gray-50 transition-colors cursor-pointer"
+                >
+                  Done
+                </button>
+                <button
+                  type="submit"
+                  disabled={addSaving}
+                  className="flex-1 px-4 py-2.5 bg-gray-900 text-white font-semibold rounded-xl hover:bg-gray-800 disabled:opacity-50 transition-colors cursor-pointer"
+                >
+                  {addSaving ? 'Adding...' : 'Add Customer'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
