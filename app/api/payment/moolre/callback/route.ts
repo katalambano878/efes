@@ -224,14 +224,24 @@ export async function POST(req: Request) {
             // Payment failed
             console.log(`[Callback] Payment FAILED for ${merchantOrderRef} | Status: ${apiStatus} | TX: ${txStatus}`);
 
+            // Fetch existing metadata so we don't overwrite it
+            const { data: failedOrderMeta } = await supabaseAdmin
+                .from('orders')
+                .select('metadata')
+                .eq('order_number', merchantOrderRef)
+                .single();
+
+            const mergedFailureMetadata = {
+                ...(failedOrderMeta?.metadata || {}),
+                moolre_reference: moolreReference,
+                failure_reason: body.message || 'Payment failed'
+            };
+
             await supabaseAdmin
                 .from('orders')
                 .update({
                     payment_status: 'failed',
-                    metadata: {
-                        moolre_reference: moolreReference,
-                        failure_reason: body.message || 'Payment failed'
-                    }
+                    metadata: mergedFailureMetadata
                 })
                 .eq('order_number', merchantOrderRef);
 

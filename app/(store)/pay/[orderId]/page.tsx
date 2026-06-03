@@ -1,23 +1,30 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import { usePageTitle } from '@/hooks/usePageTitle';
 
 export default function PaymentPage() {
   usePageTitle('Complete Payment');
-  const params = useParams();
+  const params = useParams<{ orderId?: string }>() as { orderId?: string } | null;
+  const searchParams = useSearchParams();
   const router = useRouter();
-  const orderId = params.orderId as string;
+  const orderId = params?.orderId ?? '';
+  const wasCanceled = searchParams?.get('canceled') === '1';
 
   const [order, setOrder] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [storeName, setStoreName] = useState('Efescloset');
 
   useEffect(() => {
+    // Fetch store name from settings
+    supabase.from('store_settings').select('value').eq('key', 'site_name').single()
+      .then(({ data }) => { if (data?.value) setStoreName(typeof data.value === 'string' ? data.value : String(data.value)); });
+
     async function fetchOrder() {
       try {
         // Fetch order by ID (UUID) or order_number
@@ -56,9 +63,15 @@ export default function PaymentPage() {
     }
   }, [orderId, router]);
 
+  // Show cancel message if redirected back from payment gateway
+  useEffect(() => {
+    if (!wasCanceled || !order) return;
+    setError('Payment was cancelled. You can retry below when ready.');
+  }, [order, wasCanceled]);
+
   const handlePayNow = async () => {
     if (!order) return;
-    
+
     setProcessing(true);
     setError(null);
 
@@ -68,15 +81,23 @@ export default function PaymentPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           orderId: order.order_number,
-          amount: order.total,
           customerEmail: order.email
         })
       });
 
-      const paymentResult = await paymentRes.json();
+      let paymentResult: { success?: boolean; message?: string; url?: string };
+      try {
+        paymentResult = await paymentRes.json();
+      } catch {
+        throw new Error(paymentRes.ok ? 'Invalid response from payment server.' : `Payment error (${paymentRes.status}). Please try again or contact support.`);
+      }
 
       if (!paymentResult.success) {
         throw new Error(paymentResult.message || 'Payment initialization failed');
+      }
+
+      if (!paymentResult.url) {
+        throw new Error('No payment link received. Please try again or contact support.');
       }
 
       // Redirect to Moolre payment page
@@ -84,7 +105,7 @@ export default function PaymentPage() {
 
     } catch (err: any) {
       console.error('Payment error:', err);
-      setError(err.message || 'Failed to initialize payment. Please try again.');
+      setError(err?.message || 'Failed to initialize payment. Please try again or contact support.');
       setProcessing(false);
     }
   };
@@ -109,7 +130,7 @@ export default function PaymentPage() {
           </div>
           <h1 className="text-2xl font-bold text-gray-900 mb-3">Order Not Found</h1>
           <p className="text-gray-600 mb-6">{error}</p>
-          <Link 
+          <Link
             href="/"
             className="inline-flex items-center px-6 py-3 bg-gray-900 hover:bg-gray-800 text-white rounded-lg font-semibold transition-colors"
           >
@@ -130,7 +151,7 @@ export default function PaymentPage() {
         {/* Header */}
         <div className="text-center mb-8">
           <Link href="/" className="inline-block mb-6">
-            <span className="text-2xl font-['Pacifico'] text-gray-900">Efescloset</span>
+            <span className="text-2xl font-bold text-gray-700">{storeName}</span>
           </Link>
           <h1 className="text-2xl font-bold text-gray-900">Complete Your Payment</h1>
           <p className="text-gray-600 mt-2">Hi {customerName}, your order is waiting for payment.</p>
@@ -201,6 +222,18 @@ export default function PaymentPage() {
           </div>
         )}
 
+        {/* Payment Method Display */}
+        <div className="mb-6 bg-white rounded-xl shadow-sm p-6">
+          <h2 className="text-base font-bold text-gray-900 mb-4">Payment method</h2>
+          <div className="flex items-center gap-4 p-4 rounded-xl border-2 border-gray-900 bg-gray-50">
+            <i className="ri-smartphone-line text-2xl text-gray-700 flex-shrink-0"></i>
+            <div>
+              <span className="font-semibold text-gray-900 block">Mobile Money</span>
+              <span className="text-xs text-gray-600">MTN, Vodafone, AirtelTigo</span>
+            </div>
+          </div>
+        </div>
+
         {/* Pay Button */}
         <button
           onClick={handlePayNow}
@@ -218,7 +251,9 @@ export default function PaymentPage() {
           ) : (
             <>
               <i className="ri-secure-payment-line mr-2"></i>
-              Pay GH₵ {order?.total?.toFixed(2)} with Mobile Money
+              {order?.payment_status === 'failed'
+                ? `Retry Payment (GH₵ ${order?.total?.toFixed(2)})`
+                : `Pay GH₵ ${order?.total?.toFixed(2)} with Mobile Money`}
             </>
           )}
         </button>
@@ -227,7 +262,7 @@ export default function PaymentPage() {
         <div className="mt-6 text-center">
           <p className="text-xs text-gray-500 flex items-center justify-center">
             <i className="ri-lock-line mr-1"></i>
-            Secure payment powered by Moolre
+            Secure payment · Mobile Money
           </p>
         </div>
 
