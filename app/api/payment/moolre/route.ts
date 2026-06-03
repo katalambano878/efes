@@ -69,6 +69,33 @@ export async function POST(req: Request) {
         // Generate a unique external reference for Moolre
         const uniqueRef = `${orderRef}-R${Date.now()}`;
 
+        // Persist latest payment attempt reference so verification/callback can reliably reconcile retries.
+        const { data: existingOrderForMeta, error: metaFetchError } = await supabaseAdmin
+            .from('orders')
+            .select('metadata')
+            .eq('order_number', orderRef)
+            .single();
+
+        const mergedMetadata = {
+            ...(existingOrderForMeta?.metadata || {}),
+            payment_method: 'moolre',
+            moolre_externalref: uniqueRef,
+            payment_attempted_at: new Date().toISOString()
+        };
+
+        const { error: orderUpdateError } = await supabaseAdmin
+            .from('orders')
+            .update({
+                payment_status: 'pending',
+                metadata: mergedMetadata
+            })
+            .eq('order_number', orderRef);
+
+        if (orderUpdateError) {
+            console.error('[Payment] Failed to update order metadata:', orderUpdateError.message);
+            return NextResponse.json({ success: false, message: `Failed to prepare payment: ${orderUpdateError.message}` }, { status: 500 });
+        }
+
         // Moolre Payload
         const payload = {
             type: 1,
@@ -86,7 +113,7 @@ export async function POST(req: Request) {
             }
         };
 
-        console.log('[Payment] Initiating for order:', orderRef, '| Amount from DB:', amount, '| Callback:', payload.callback);
+        console.log('[Payment] Initiating for order:', orderRef, '| Amount from DB:', amount, '| ExternalRef:', uniqueRef, '| Callback:', payload.callback);
 
         const response = await fetch('https://api.moolre.com/embed/link', {
             method: 'POST',

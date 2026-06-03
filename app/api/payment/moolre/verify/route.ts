@@ -82,6 +82,10 @@ export async function POST(req: Request) {
         }
 
         try {
+            // Use the stored externalref (with retry suffix) — Moolre registered it with this reference
+            const externalRefToCheck = order.metadata?.moolre_externalref || orderNumber;
+            console.log('[Verify] Checking Moolre with externalref:', externalRefToCheck);
+
             const checkResponse = await fetch('https://api.moolre.com/embed/status', {
                 method: 'POST',
                 headers: {
@@ -89,7 +93,7 @@ export async function POST(req: Request) {
                     'X-API-USER': process.env.MOOLRE_API_USER,
                     'X-API-PUBKEY': process.env.MOOLRE_API_PUBKEY
                 },
-                body: JSON.stringify({ externalref: orderNumber })
+                body: JSON.stringify({ externalref: externalRefToCheck })
             });
 
             const checkResult = await checkResponse.json();
