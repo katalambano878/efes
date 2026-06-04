@@ -21,6 +21,12 @@ import {
   type ChatOrderResult,
 } from '@/lib/chat-tools';
 import { searchSiteKnowledge, getSiteMapSummary } from '@/lib/site-knowledge';
+import {
+  appendSocialFollowHint,
+  fetchChatSocialLinks,
+  isConversationWrappingUp,
+  type ChatSocialLink,
+} from '@/lib/chat-social-links';
 
 // ─── Env ────────────────────────────────────────────────────────────────────
 
@@ -43,6 +49,7 @@ interface ChatMessage {
   returnCard?: ChatReturn;
   couponCard?: ChatCoupon;
   products?: ChatProduct[];
+  socialLinks?: ChatSocialLink[];
 }
 
 interface ChatAction {
@@ -419,6 +426,9 @@ If you genuinely cannot answer a question or resolve an issue (whether it's beyo
 2. ALWAYS direct customers to the Contact page for phone, email, and address. Say something like: "I've created a support ticket for you. For a faster response, you can also reach us via the Contact page."
 Never leave a customer stuck without a path forward.
 
+WHEN THE CONVERSATION IS WRAPPING UP:
+When the customer says thanks, bye, or signals they are done, OR you have fully resolved their request and they have no further questions, end warmly in 1–2 sentences. Mention that they can follow the store on social media for new arrivals and styling updates. Do NOT paste long URLs — the chat will show follow buttons automatically.
+
 ${getSiteMapSummary()}`;
 
   if (profile) {
@@ -564,6 +574,8 @@ export async function POST(request: Request) {
       result = await handleWithoutAI(supabase, userText, profile);
     }
 
+    result = await attachSocialFollowIfWrappingUp(supabase, result, userText);
+
     if (sessionId) {
       persistConversation(supabase, sessionId, userId, userEmail, profile, messages, userText, result, pagePath).catch((e) =>
         console.error('[Chat API] Persistence error:', e)
@@ -589,6 +601,31 @@ export async function POST(request: Request) {
       { status: 500 }
     );
   }
+}
+
+// ─── Social follow (end of conversation) ────────────────────────────────────
+
+async function attachSocialFollowIfWrappingUp(
+  supabase: ReturnType<typeof createClient>,
+  result: Record<string, unknown>,
+  userText: string
+): Promise<Record<string, unknown>> {
+  if (!isConversationWrappingUp(userText)) return result;
+
+  const socialLinks = await fetchChatSocialLinks(supabase);
+  if (socialLinks.length === 0) return result;
+
+  const message =
+    typeof result.message === 'string'
+      ? appendSocialFollowHint(result.message)
+      : appendSocialFollowHint('');
+
+  return {
+    ...result,
+    message,
+    socialLinks,
+    quickReplies: ['Continue shopping', 'Track my order'],
+  };
 }
 
 // ─── Conversation Persistence ───────────────────────────────────────────────

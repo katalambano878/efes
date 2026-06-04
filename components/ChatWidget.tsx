@@ -56,6 +56,13 @@ type ChatCoupon = {
   expires?: string;
 };
 
+type ChatSocialLink = {
+  id: string;
+  label: string;
+  url: string;
+  icon: string;
+};
+
 type ChatAction = {
   type: 'add_to_cart' | 'view_product' | 'view_order' | 'track_order' | 'apply_coupon' | 'payment_link';
   product?: ChatProduct;
@@ -78,6 +85,7 @@ type ChatMessage = {
   ticketCard?: ChatTicket;
   returnCard?: ChatReturn;
   couponCard?: ChatCoupon;
+  socialLinks?: ChatSocialLink[];
   timestamp?: number;
   isVoice?: boolean;
   audioUrl?: string;
@@ -297,6 +305,7 @@ export default function ChatWidget() {
         ticketCard: data.ticketCard,
         returnCard: data.returnCard,
         couponCard: data.couponCard,
+        socialLinks: data.socialLinks,
         timestamp: Date.now(),
       };
       setMessages((prev) => [...prev, assistantMsg]);
@@ -410,6 +419,7 @@ export default function ChatWidget() {
         ticketCard: chatData.ticketCard,
         returnCard: chatData.returnCard,
         couponCard: chatData.couponCard,
+        socialLinks: chatData.socialLinks,
         isVoice: true,
         timestamp: Date.now(),
       };
@@ -879,6 +889,11 @@ function MessageBubble({
         {/* Coupon Card */}
         {message.couponCard && <CouponCard coupon={message.couponCard} />}
 
+        {/* Social follow links (end of conversation) */}
+        {message.socialLinks && message.socialLinks.length > 0 && (
+          <SocialFollowCard links={message.socialLinks} />
+        )}
+
         {/* Payment Link Button */}
         {message.actions?.filter(a => a.type === 'payment_link').map((a, idx) => (
           <a
@@ -1092,6 +1107,39 @@ function CouponCard({ coupon }: { coupon: ChatCoupon }) {
         {coupon.valid && coupon.expires && (
           <p className="text-[10px] text-gray-400">Expires: {new Date(coupon.expires).toLocaleDateString('en-GB')}</p>
         )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Social Follow Card ─────────────────────────────────────────────────────
+
+function SocialFollowCard({ links }: { links: ChatSocialLink[] }) {
+  return (
+    <div className="rounded-xl border border-gray-200 bg-gradient-to-br from-gray-50 to-white shadow-sm overflow-hidden">
+      <div className="px-4 py-3 border-b border-gray-100">
+        <p className="text-xs font-bold text-gray-900 flex items-center gap-1.5">
+          <i className="ri-heart-line text-rose-500" />
+          Follow Efescloset
+        </p>
+        <p className="text-[10px] text-gray-500 mt-0.5">New drops, styling tips &amp; updates</p>
+      </div>
+      <div className="p-3 flex flex-col gap-2">
+        {links.map((link) => (
+          <a
+            key={link.id}
+            href={link.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-3 px-3 py-2.5 rounded-lg border border-gray-200 bg-white hover:border-gray-400 hover:bg-gray-50 transition-all active:scale-[0.98] text-sm font-medium text-gray-800"
+          >
+            <span className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0">
+              <i className={`${link.icon} text-lg text-gray-700`} />
+            </span>
+            <span className="flex-1">{link.label}</span>
+            <i className="ri-external-link-line text-gray-400 text-sm" />
+          </a>
+        ))}
       </div>
     </div>
   );

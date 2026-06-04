@@ -342,7 +342,7 @@ export default function AdminCategoriesPage() {
                               <img
                                 src={category.image_url}
                                 alt={category.name}
-                                className="w-full h-full object-cover"
+                                className="w-full h-full object-contain bg-[#f3f3f3]"
                               />
                             ) : (
                               <div className="w-full h-full flex items-center justify-center text-gray-400">
@@ -400,7 +400,7 @@ export default function AdminCategoriesPage() {
                       <div className="flex items-center space-x-3">
                         <div className="w-16 h-16 bg-gray-100 rounded-lg overflow-hidden border border-gray-200">
                           {category.image_url ? (
-                            <img src={category.image_url} alt={category.name} className="w-full h-full object-cover" />
+                            <img src={category.image_url} alt={category.name} className="w-full h-full object-contain bg-[#f3f3f3]" />
                           ) : (
                             <div className="w-full h-full flex items-center justify-center text-gray-400">
                               <i className="ri-image-line text-2xl"></i>
