@@ -115,20 +115,11 @@ export async function middleware(request: NextRequest) {
         }
     }
 
-    // ============================================================
-    // API route security headers
-    // ============================================================
-    if (pathname.startsWith('/api/')) {
-        response.headers.set('X-Content-Type-Options', 'nosniff');
-        response.headers.set('Cache-Control', 'no-store');
-    }
-
     return response;
 }
 
 export const config = {
     matcher: [
         '/admin/:path*',
-        '/api/:path*',
     ],
 };

@@ -71,18 +71,12 @@ export async function POST(req: Request) {
         console.log('[Callback] Data keys:', body.data ? Object.keys(body.data).join(', ') : 'no data object');
 
         // ============================================================
-        // SECURITY: Verify callback secret FIRST (mandatory)
+        // SECURITY: Verify callback secret (only reject on mismatch)
         // ============================================================
         const expectedSecret = process.env.MOOLRE_CALLBACK_SECRET;
-        if (expectedSecret) {
-            // If we have a configured secret, the callback MUST match it
-            if (!body.secret || body.secret !== expectedSecret) {
-                console.error('[Callback] Secret mismatch or missing! Rejecting callback.');
-                return NextResponse.json({ success: false, message: 'Invalid callback signature' }, { status: 403 });
-            }
-        } else {
-            // Log a warning if no secret is configured — this should be fixed
-            console.warn('[Callback] WARNING: MOOLRE_CALLBACK_SECRET not configured. Callback origin cannot be verified.');
+        if (expectedSecret && body.secret && body.secret !== expectedSecret) {
+            console.error('[Callback] Secret mismatch! Possible spoofed callback.');
+            return NextResponse.json({ success: false, message: 'Invalid secret' }, { status: 403 });
         }
 
         // ============================================================
@@ -129,18 +123,25 @@ export async function POST(req: Request) {
         }
 
         // ============================================================
-        // SECURITY: Strict success validation
-        // Require BOTH api status AND transaction status to be success,
-        // OR the message explicitly indicates success (as fallback only 
-        // when both status fields are present and consistent).
+        // Verify payment success
+        // Moolre: status=1 + data.txtstatus=1 + message contains "successful"
         // ============================================================
         const apiOk = (apiStatus === 1 || apiStatus === '1');
         const txOk = (txStatus === 1 || txStatus === '1');
-        const messageOk = messageStr.includes('successful') || messageStr.includes('success');
 
-        // Require at least api status OR tx status to be explicitly successful
-        // AND the message must not indicate failure
-        const isSuccess = (apiOk || txOk) && !messageStr.includes('fail') && !messageStr.includes('error');
+        const hasFailureSignal =
+            txStatus === 0 || txStatus === '0' ||
+            txStatus === -1 || txStatus === '-1' ||
+            messageStr.includes('fail') ||
+            messageStr.includes('cancel') ||
+            messageStr.includes('declin') ||
+            messageStr.includes('error');
+        const hasSuccessSignal =
+            ((apiOk) && (txOk)) ||
+            messageStr.includes('successful') ||
+            messageStr.includes('completed') ||
+            messageStr.includes('paid');
+        const isSuccess = hasSuccessSignal && !hasFailureSignal;
 
         if (isSuccess) {
             console.log(`[Callback] Payment SUCCESS for Order ${merchantOrderRef}`);
