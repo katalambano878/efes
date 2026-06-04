@@ -42,9 +42,7 @@ export function isConversationWrappingUp(userText: string): boolean {
   );
 }
 
-export async function fetchChatSocialLinks(supabase: {
-  from: (table: string) => { select: (cols: string) => { in: (col: string, vals: string[]) => Promise<{ data: { key: string; value: string }[] | null }> } };
-}): Promise<ChatSocialLink[]> {
+export async function fetchChatSocialLinks(supabase: any): Promise<ChatSocialLink[]> {
   const keys = [
     'social_instagram',
     'social_tiktok',

@@ -606,7 +606,7 @@ export async function POST(request: Request) {
 // ─── Social follow (end of conversation) ────────────────────────────────────
 
 async function attachSocialFollowIfWrappingUp(
-  supabase: ReturnType<typeof createClient>,
+  supabase: any,
   result: Record<string, unknown>,
   userText: string
 ): Promise<Record<string, unknown>> {
