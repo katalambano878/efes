@@ -2,6 +2,8 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import PageHero from '@/components/PageHero';
+import CategoryTileImage from '@/components/CategoryTileImage';
+import { resolveCategoryImageUrl } from '@/lib/category-image-url';
 
 const siteName = process.env.NEXT_PUBLIC_SITE_NAME || 'Efescloset';
 const siteUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
@@ -54,7 +56,7 @@ export default async function CategoriesPage() {
     const style = palette[i % palette.length];
     return {
       ...c,
-      image: c.image_url || 'https://via.placeholder.com/600x400?text=Category',
+      image: resolveCategoryImageUrl(c.image_url, c.name),
       color: style.color,
       icon: style.icon,
       // Optional: Fetch product count if needed, currently skipping for performance/simplicity
@@ -113,9 +115,9 @@ export default async function CategoriesPage() {
                 <div className="relative h-64 bg-[#f3f3f3]">
                   <div className="absolute inset-0 overflow-hidden rounded-t-[2rem]">
                     <div className="absolute inset-0 bg-black/5 z-10 transition-opacity duration-500 group-hover:opacity-0" />
-                    <img
-                      src={category.image}
-                      alt={category.name}
+                    <CategoryTileImage
+                      imageUrl={category.image_url}
+                      name={category.name}
                       className="w-full h-full object-contain transform group-hover:scale-[1.02] transition-transform duration-700 ease-[cubic-bezier(0.25,1,0.5,1)]"
                     />
                     <div className={`absolute inset-0 bg-gradient-to-t ${category.color} mix-blend-multiply opacity-0 group-hover:opacity-30 transition-opacity duration-700 z-10`} />

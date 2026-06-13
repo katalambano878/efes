@@ -7,6 +7,7 @@ import { supabase } from '@/lib/supabase';
 import ProductCard, { type ColorVariant, getColorHex } from '@/components/ProductCard';
 import ProductCardSkeleton from '@/components/skeletons/ProductCardSkeleton';
 import AnimatedSection, { AnimatedGrid } from '@/components/AnimatedSection';
+import CategoryTileImage from '@/components/CategoryTileImage';
 import { usePageTitle } from '@/hooks/usePageTitle';
 import {
   DEFAULT_HERO_BANNER_CONFIG,
@@ -270,13 +271,10 @@ export default function Home() {
             {categories.map((category) => (
               <Link href={`/shop?category=${category.slug}`} key={category.id} className="group outline-none block">
                 <div className="relative aspect-[3/4] sm:aspect-[4/5] rounded-2xl sm:rounded-[2rem] overflow-hidden bg-[#f3f3f3] shadow-sm hover:shadow-2xl transition-all duration-700 ease-[cubic-bezier(0.25,1,0.5,1)]">
-                  <Image
-                    src={category.image || category.image_url || 'https://via.placeholder.com/600x800?text=' + encodeURIComponent(category.name)}
-                    alt={category.name}
-                    fill
-                    className="object-contain transform transition-transform duration-1000 ease-[cubic-bezier(0.25,1,0.5,1)] group-hover:scale-[1.02]"
-                    sizes="(max-width: 768px) 50vw, 25vw"
-                    quality={85}
+                  <CategoryTileImage
+                    imageUrl={category.image_url}
+                    name={category.name}
+                    className="absolute inset-0 w-full h-full object-contain transform transition-transform duration-1000 ease-[cubic-bezier(0.25,1,0.5,1)] group-hover:scale-[1.02]"
                   />
 
                   {/* Subtle darkening for text contrast */}

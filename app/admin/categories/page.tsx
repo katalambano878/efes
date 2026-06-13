@@ -141,6 +141,8 @@ export default function AdminCategoriesPage() {
       const file = e.target.files[0];
       const formData = new FormData();
       formData.append('file', file);
+      formData.append('bucket', 'media');
+      formData.append('folder', 'categories');
 
       const { data: { session } } = await supabase.auth.getSession();
       const res = await fetch('/api/admin/upload', {
@@ -538,6 +540,9 @@ export default function AdminCategoriesPage() {
                 <label className="block text-sm font-semibold text-gray-900 mb-2">
                   Category Image
                 </label>
+                <p className="text-xs text-gray-500 mb-2">
+                  JPG, PNG, or phone photos (HEIC) — we automatically resize and compress on upload.
+                </p>
                 <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-gray-900 hover:bg-gray-50 transition-colors relative">
                   {uploading ? (
                     <div className="flex flex-col items-center">

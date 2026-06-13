@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { isLikelyImageFile, optimizeUploadedImage } from '@/lib/optimize-image';
 
 function getAccessToken(request: Request): string | null {
   const authHeader = request.headers.get('authorization');
@@ -47,7 +48,8 @@ async function requireAdmin(request: Request): Promise<NextResponse | null> {
 
 /**
  * POST /api/admin/upload
- * Body: multipart/form-data with field "file" (and optional "bucket", default "products").
+ * Body: multipart/form-data with field "file" (optional "bucket", default "products"; optional "folder").
+ * Images are resized (max 1600px) and converted to WebP before upload.
  * Returns { url: string } public URL. Uses service role so storage RLS is bypassed.
  */
 export async function POST(request: Request) {
@@ -58,17 +60,40 @@ export async function POST(request: Request) {
     const formData = await request.formData();
     const file = formData.get('file') as File | null;
     const bucket = (formData.get('bucket') as string) || 'products';
+    const folderRaw = (formData.get('folder') as string) || '';
+    const folder = folderRaw.replace(/^\/+|\/+$/g, '');
 
     if (!file || !(file instanceof Blob)) {
       return NextResponse.json({ error: 'Missing file' }, { status: 400 });
     }
 
-    const ext = file.name.split('.').pop() || 'jpg';
-    const path = `cat-${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+    if (!isLikelyImageFile(file)) {
+      return NextResponse.json({ error: 'Please upload an image file (JPG, PNG, WebP, HEIC, etc.)' }, { status: 400 });
+    }
 
-    const { error } = await supabaseAdmin.storage.from(bucket).upload(path, file, {
-      cacheControl: '3600',
+    const inputBuffer = Buffer.from(await file.arrayBuffer());
+
+    let uploadBuffer: Buffer;
+    let contentType: string;
+    let ext: string;
+
+    try {
+      const optimized = await optimizeUploadedImage(inputBuffer);
+      uploadBuffer = optimized.buffer;
+      contentType = optimized.contentType;
+      ext = optimized.ext;
+    } catch (optErr: unknown) {
+      const msg = optErr instanceof Error ? optErr.message : 'Invalid image';
+      return NextResponse.json({ error: msg }, { status: 400 });
+    }
+
+    const baseName = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+    const path = folder ? `${folder}/${baseName}` : baseName;
+
+    const { error } = await supabaseAdmin.storage.from(bucket).upload(path, uploadBuffer, {
+      cacheControl: '31536000',
       upsert: false,
+      contentType,
     });
 
     if (error) {
@@ -77,7 +102,8 @@ export async function POST(request: Request) {
 
     const { data: { publicUrl } } = supabaseAdmin.storage.from(bucket).getPublicUrl(path);
     return NextResponse.json({ url: publicUrl });
-  } catch (e: any) {
-    return NextResponse.json({ error: e?.message || 'Upload failed' }, { status: 500 });
+  } catch (e: unknown) {
+    const message = e instanceof Error ? e.message : 'Upload failed';
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
