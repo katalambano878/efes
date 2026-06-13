@@ -2,6 +2,9 @@ import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { isLikelyImageFile, optimizeUploadedImage } from '@/lib/optimize-image';
 
+export const runtime = 'nodejs';
+export const maxDuration = 30;
+
 function getAccessToken(request: Request): string | null {
   const authHeader = request.headers.get('authorization');
   if (authHeader?.startsWith('Bearer ')) return authHeader.slice(7).trim();
@@ -73,19 +76,11 @@ export async function POST(request: Request) {
 
     const inputBuffer = Buffer.from(await file.arrayBuffer());
 
-    let uploadBuffer: Buffer;
-    let contentType: string;
-    let ext: string;
-
-    try {
-      const optimized = await optimizeUploadedImage(inputBuffer);
-      uploadBuffer = optimized.buffer;
-      contentType = optimized.contentType;
-      ext = optimized.ext;
-    } catch (optErr: unknown) {
-      const msg = optErr instanceof Error ? optErr.message : 'Invalid image';
-      return NextResponse.json({ error: msg }, { status: 400 });
-    }
+    const { buffer: uploadBuffer, contentType, ext } = await optimizeUploadedImage(
+      inputBuffer,
+      file.name,
+      file.type
+    );
 
     const baseName = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
     const path = folder ? `${folder}/${baseName}` : baseName;

@@ -541,7 +541,7 @@ export default function AdminCategoriesPage() {
                   Category Image
                 </label>
                 <p className="text-xs text-gray-500 mb-2">
-                  JPG, PNG, or phone photos (HEIC) — we automatically resize and compress on upload.
+                  Use JPG, PNG, or WebP for best results — images are resized and compressed automatically. (iPhone HEIC photos may not display; convert to JPG first.)
                 </p>
                 <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-gray-900 hover:bg-gray-50 transition-colors relative">
                   {uploading ? (
