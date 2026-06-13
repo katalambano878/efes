@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
+import { compressImageForUpload } from '@/lib/client-image';
 import {
   DEFAULT_HERO_BANNER_CONFIG,
   HERO_SLIDES_JSON_KEY,
@@ -137,8 +138,9 @@ export default function CMSPage() {
 
     setUploadingHeroSlide(slideIndex);
     try {
+      const optimized = await compressImageForUpload(file);
       const formData = new FormData();
-      formData.append('file', file);
+      formData.append('file', optimized);
       formData.append('bucket', 'products');
 
       const { data: { session } } = await supabase.auth.getSession();

@@ -5,6 +5,7 @@ import { useState, useEffect } from 'react';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 import { supabase } from '@/lib/supabase'; // used for categories fetch only
 import { useRouter } from 'next/navigation';
+import { compressImageForUpload } from '@/lib/client-image';
 
 interface ProductFormProps {
     initialData?: any;
@@ -390,13 +391,15 @@ export default function ProductForm({ initialData, isEditMode = false }: Product
             const newImages: any[] = [];
 
             for (let i = 0; i < files.length; i++) {
-                const file = files[i];
-                const fileExt = file.name.split('.').pop()?.toLowerCase() || '';
+                const original = files[i];
+                const fileExt = original.name.split('.').pop()?.toLowerCase() || '';
                 const isVideo = ['mp4', 'mov', 'webm'].includes(fileExt);
+
+                const file = isVideo ? original : await compressImageForUpload(original);
 
                 const maxSize = isVideo ? 100 * 1024 * 1024 : 5 * 1024 * 1024;
                 if (file.size > maxSize) {
-                    alert(`"${file.name}" is too large. Max: ${isVideo ? '100MB for videos' : '5MB for images'}`);
+                    alert(`"${original.name}" is too large. Max: ${isVideo ? '100MB for videos' : '5MB for images'}`);
                     setUploadProgress(prev => prev.map((p, idx) => idx === i ? { ...p, done: true } : p));
                     continue;
                 }
@@ -1285,8 +1288,9 @@ export default function ProductForm({ initialData, isEditMode = false }: Product
                                                                                 accept=".jpg,.jpeg,.png,.webp"
                                                                                 className="hidden"
                                                                                 onChange={async (e) => {
-                                                                                    const file = e.target.files?.[0];
-                                                                                    if (!file) return;
+                                                                                    const picked = e.target.files?.[0];
+                                                                                    if (!picked) return;
+                                                                                    const file = await compressImageForUpload(picked);
                                                                                     const fd = new FormData();
                                                                                     fd.append('file', file);
                                                                                     fd.append('bucket', 'products');
@@ -1855,10 +1859,11 @@ export default function ProductForm({ initialData, isEditMode = false }: Product
                                                         className="hidden"
                                                         disabled={ogImageUploading}
                                                         onChange={async (e) => {
-                                                            const file = e.target.files?.[0];
-                                                            if (!file) return;
+                                                            const picked = e.target.files?.[0];
+                                                            if (!picked) return;
                                                             try {
                                                                 setOgImageUploading(true);
+                                                                const file = await compressImageForUpload(picked);
                                                                 const fd = new FormData();
                                                                 fd.append('file', file);
                                                                 fd.append('bucket', 'products');

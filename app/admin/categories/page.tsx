@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { DragDropContext, Droppable, Draggable, type DropResult } from '@hello-pangea/dnd';
 import { supabase } from '@/lib/supabase';
+import { compressImageForUpload } from '@/lib/client-image';
 
 export default function AdminCategoriesPage() {
   const [showAddModal, setShowAddModal] = useState(false);
@@ -138,7 +139,7 @@ export default function AdminCategoriesPage() {
       if (!e.target.files || e.target.files.length === 0) return;
 
       setUploading(true);
-      const file = e.target.files[0];
+      const file = await compressImageForUpload(e.target.files[0]);
       const formData = new FormData();
       formData.append('file', file);
       formData.append('bucket', 'media');

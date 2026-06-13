@@ -1,9 +1,7 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { isLikelyImageFile, optimizeUploadedImage } from '@/lib/optimize-image';
 
 export const runtime = 'nodejs';
-export const maxDuration = 30;
 
 function getAccessToken(request: Request): string | null {
   const authHeader = request.headers.get('authorization');
@@ -49,10 +47,17 @@ async function requireAdmin(request: Request): Promise<NextResponse | null> {
   return null;
 }
 
+function extFromFile(file: File): string {
+  const fromName = file.name.toLowerCase().match(/\.([a-z0-9]+)$/)?.[1];
+  if (fromName) return fromName;
+  const fromType = file.type.split('/')[1];
+  return fromType || 'jpg';
+}
+
 /**
  * POST /api/admin/upload
  * Body: multipart/form-data with field "file" (optional "bucket", default "products"; optional "folder").
- * Images are resized (max 1600px) and converted to WebP before upload.
+ * Images are expected to be compressed client-side before upload (see lib/client-image.ts).
  * Returns { url: string } public URL. Uses service role so storage RLS is bypassed.
  */
 export async function POST(request: Request) {
@@ -70,25 +75,14 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Missing file' }, { status: 400 });
     }
 
-    if (!isLikelyImageFile(file)) {
-      return NextResponse.json({ error: 'Please upload an image file (JPG, PNG, WebP, HEIC, etc.)' }, { status: 400 });
-    }
-
-    const inputBuffer = Buffer.from(await file.arrayBuffer());
-
-    const { buffer: uploadBuffer, contentType, ext } = await optimizeUploadedImage(
-      inputBuffer,
-      file.name,
-      file.type
-    );
-
+    const ext = extFromFile(file);
     const baseName = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
     const path = folder ? `${folder}/${baseName}` : baseName;
 
-    const { error } = await supabaseAdmin.storage.from(bucket).upload(path, uploadBuffer, {
+    const { error } = await supabaseAdmin.storage.from(bucket).upload(path, file, {
       cacheControl: '31536000',
       upsert: false,
-      contentType,
+      contentType: file.type || 'application/octet-stream',
     });
 
     if (error) {
