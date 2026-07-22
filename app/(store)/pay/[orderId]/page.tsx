@@ -19,6 +19,7 @@ export default function PaymentPage() {
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [storeName, setStoreName] = useState('Efescloset');
+  const [paymentMethod, setPaymentMethod] = useState<'hubtel' | 'moolre'>('hubtel');
 
   useEffect(() => {
     // Fetch store name from settings
@@ -43,6 +44,14 @@ export default function PaymentPage() {
         }
 
         setOrder(data);
+
+        const storedMethod =
+          data.payment_method ||
+          data.metadata?.payment_method ||
+          data.metadata?.payment_gateway;
+        if (storedMethod === 'moolre' || storedMethod === 'hubtel') {
+          setPaymentMethod(storedMethod);
+        }
 
         // If already paid, redirect to success page
         if (data.payment_status === 'paid') {
@@ -76,7 +85,10 @@ export default function PaymentPage() {
     setError(null);
 
     try {
-      const paymentRes = await fetch('/api/payment/moolre', {
+      const paymentEndpoint =
+        paymentMethod === 'hubtel' ? '/api/payment/hubtel' : '/api/payment/moolre';
+
+      const paymentRes = await fetch(paymentEndpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -100,7 +112,6 @@ export default function PaymentPage() {
         throw new Error('No payment link received. Please try again or contact support.');
       }
 
-      // Redirect to Moolre payment page
       window.location.href = paymentResult.url;
 
     } catch (err: any) {
@@ -222,15 +233,46 @@ export default function PaymentPage() {
           </div>
         )}
 
-        {/* Payment Method Display */}
+        {/* Payment Method Selection */}
         <div className="mb-6 bg-white rounded-xl shadow-sm p-6">
           <h2 className="text-base font-bold text-gray-900 mb-4">Payment method</h2>
-          <div className="flex items-center gap-4 p-4 rounded-xl border-2 border-gray-900 bg-gray-50">
-            <i className="ri-smartphone-line text-2xl text-gray-700 flex-shrink-0"></i>
-            <div>
-              <span className="font-semibold text-gray-900 block">Mobile Money</span>
-              <span className="text-xs text-gray-600">MTN, Vodafone, AirtelTigo</span>
-            </div>
+          <div className="space-y-3">
+            <label
+              className={`flex items-start gap-3 p-4 rounded-xl border-2 cursor-pointer transition-colors ${
+                paymentMethod === 'hubtel' ? 'border-gray-900 bg-gray-50' : 'border-gray-200 hover:border-gray-300'
+              }`}
+            >
+              <input
+                type="radio"
+                name="pay-gateway"
+                value="hubtel"
+                checked={paymentMethod === 'hubtel'}
+                onChange={() => setPaymentMethod('hubtel')}
+                className="w-5 h-5 text-gray-900 mt-0.5"
+              />
+              <div>
+                <span className="font-semibold text-gray-900 block">Hubtel</span>
+                <span className="text-xs text-gray-600">Mobile Money / Cards</span>
+              </div>
+            </label>
+            <label
+              className={`flex items-start gap-3 p-4 rounded-xl border-2 cursor-pointer transition-colors ${
+                paymentMethod === 'moolre' ? 'border-gray-900 bg-gray-50' : 'border-gray-200 hover:border-gray-300'
+              }`}
+            >
+              <input
+                type="radio"
+                name="pay-gateway"
+                value="moolre"
+                checked={paymentMethod === 'moolre'}
+                onChange={() => setPaymentMethod('moolre')}
+                className="w-5 h-5 text-gray-900 mt-0.5"
+              />
+              <div>
+                <span className="font-semibold text-gray-900 block">Moolre</span>
+                <span className="text-xs text-gray-600">Mobile Money / Cards</span>
+              </div>
+            </label>
           </div>
         </div>
 
@@ -252,8 +294,8 @@ export default function PaymentPage() {
             <>
               <i className="ri-secure-payment-line mr-2"></i>
               {order?.payment_status === 'failed'
-                ? `Retry Payment (GH₵ ${order?.total?.toFixed(2)})`
-                : `Pay GH₵ ${order?.total?.toFixed(2)} with Mobile Money`}
+                ? `Retry with ${paymentMethod === 'hubtel' ? 'Hubtel' : 'Moolre'} (GH₵ ${order?.total?.toFixed(2)})`
+                : `Pay GH₵ ${order?.total?.toFixed(2)} with ${paymentMethod === 'hubtel' ? 'Hubtel' : 'Moolre'}`}
             </>
           )}
         </button>
@@ -262,7 +304,7 @@ export default function PaymentPage() {
         <div className="mt-6 text-center">
           <p className="text-xs text-gray-500 flex items-center justify-center">
             <i className="ri-lock-line mr-1"></i>
-            Secure payment · Mobile Money
+            Secure payment · Mobile Money / Cards
           </p>
         </div>
 

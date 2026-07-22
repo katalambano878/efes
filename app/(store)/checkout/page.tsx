@@ -55,7 +55,7 @@ export default function CheckoutPage() {
   ];
 
   const [deliveryMethod, setDeliveryMethod] = useState('pickup');
-  const [paymentMethod, setPaymentMethod] = useState('moolre');
+  const [paymentMethod, setPaymentMethod] = useState<'hubtel' | 'moolre'>('hubtel');
   const [errors, setErrors] = useState<any>({});
 
 
@@ -126,8 +126,11 @@ export default function CheckoutPage() {
   };
 
   const handleContinueToPayment = async () => {
-    // Skip step 3 and directly initiate payment with default method (Moolre/Mobile Money)
-    await handlePlaceOrder();
+    if (currentStep === 3) {
+      await handlePlaceOrder();
+      return;
+    }
+    setCurrentStep(3);
   };
 
 
@@ -195,12 +198,13 @@ export default function CheckoutPage() {
       if (!checkoutRes.ok) throw new Error(checkoutResult.error || 'Failed to place order');
       const order = checkoutResult.order;
 
-      // 4. Handle Payment Redirects or Completion
-      if (paymentMethod === 'moolre') {
+      // 4. Handle Payment Redirects (Hubtel or Moolre)
+      if (paymentMethod === 'hubtel' || paymentMethod === 'moolre') {
         try {
-          // Payment link reminder will be sent automatically after 15 mins if unpaid (via cron)
+          const paymentEndpoint =
+            paymentMethod === 'hubtel' ? '/api/payment/hubtel' : '/api/payment/moolre';
 
-          const paymentRes = await fetch('/api/payment/moolre', {
+          const paymentRes = await fetch(paymentEndpoint, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -216,10 +220,7 @@ export default function CheckoutPage() {
             throw new Error(paymentResult.message || 'Payment initialization failed');
           }
 
-          // Clear cart before redirecting
           clearCart();
-
-          // Redirect to Moolre
           window.location.href = paymentResult.url;
           return;
 
@@ -227,7 +228,7 @@ export default function CheckoutPage() {
           console.error('Payment Error:', paymentErr);
           alert('Failed to initialize payment: ' + paymentErr.message);
           setIsLoading(false);
-          return; // Stop execution
+          return;
         }
       }
 
@@ -570,17 +571,7 @@ export default function CheckoutPage() {
                       disabled={isLoading}
                       className="flex-1 bg-gray-900 hover:bg-gray-800 text-white py-4 rounded-lg font-semibold transition-colors whitespace-nowrap cursor-pointer disabled:opacity-70 flex items-center justify-center"
                     >
-                      {isLoading ? (
-                        <>
-                          <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                          </svg>
-                          Processing...
-                        </>
-                      ) : (
-                        'Pay with Mobile Money'
-                      )}
+                      Continue to Payment
                     </button>
                   </div>
                 </div>
@@ -589,7 +580,91 @@ export default function CheckoutPage() {
               </>
             )}
 
-            {/* Step 3 removed - payment now initiates directly from step 2 */}
+            {currentStep === 3 && (
+              <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
+                <h2 className="text-xl font-bold text-gray-900 mb-2">Payment Method</h2>
+                <p className="text-sm text-gray-600 mb-6">
+                  Choose how you want to pay. Both options support Mobile Money and cards.
+                </p>
+
+                <div className="space-y-4">
+                  <label
+                    className={`flex items-start gap-4 p-4 border-2 rounded-lg cursor-pointer transition-colors ${
+                      paymentMethod === 'hubtel'
+                        ? 'border-gray-900 bg-gray-100'
+                        : 'border-gray-300 hover:border-gray-400'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="payment"
+                      value="hubtel"
+                      checked={paymentMethod === 'hubtel'}
+                      onChange={() => setPaymentMethod('hubtel')}
+                      className="w-5 h-5 text-gray-900 mt-1"
+                    />
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <i className="ri-bank-card-line text-xl text-gray-800"></i>
+                        <p className="font-semibold text-gray-900">Hubtel</p>
+                      </div>
+                      <p className="text-sm text-gray-600 mt-1">Mobile Money / Cards</p>
+                    </div>
+                  </label>
+
+                  <label
+                    className={`flex items-start gap-4 p-4 border-2 rounded-lg cursor-pointer transition-colors ${
+                      paymentMethod === 'moolre'
+                        ? 'border-gray-900 bg-gray-100'
+                        : 'border-gray-300 hover:border-gray-400'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="payment"
+                      value="moolre"
+                      checked={paymentMethod === 'moolre'}
+                      onChange={() => setPaymentMethod('moolre')}
+                      className="w-5 h-5 text-gray-900 mt-1"
+                    />
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <i className="ri-smartphone-line text-xl text-gray-800"></i>
+                        <p className="font-semibold text-gray-900">Moolre</p>
+                      </div>
+                      <p className="text-sm text-gray-600 mt-1">Mobile Money / Cards</p>
+                    </div>
+                  </label>
+                </div>
+
+                <div className="flex flex-col-reverse md:flex-row gap-4 mt-6">
+                  <button
+                    onClick={() => setCurrentStep(2)}
+                    disabled={isLoading}
+                    className="flex-1 border-2 border-gray-300 hover:border-gray-400 text-gray-700 py-4 rounded-lg font-semibold transition-colors whitespace-nowrap cursor-pointer disabled:opacity-50"
+                  >
+                    Back
+                  </button>
+                  <button
+                    onClick={handleContinueToPayment}
+                    disabled={isLoading || verifying}
+                    className="flex-1 bg-gray-900 hover:bg-gray-800 text-white py-4 rounded-lg font-semibold transition-colors whitespace-nowrap cursor-pointer disabled:opacity-70 flex items-center justify-center"
+                  >
+                    {isLoading || verifying ? (
+                      <>
+                        <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Processing...
+                      </>
+                    ) : (
+                      `Pay with ${paymentMethod === 'hubtel' ? 'Hubtel' : 'Moolre'}`
+                    )}
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="lg:col-span-1">
