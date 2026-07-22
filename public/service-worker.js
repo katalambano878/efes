@@ -1,5 +1,6 @@
 // PWA Service Worker v3.0
-const CACHE_VERSION = '__CACHE_VERSION__';
+// Bump when storage/image caching behavior changes (inject-sw-version may not run on Coolify)
+const CACHE_VERSION = 'sw-storage-bypass-20260722';
 const STATIC_CACHE = `static-${CACHE_VERSION}`;
 const DYNAMIC_CACHE = `dynamic-${CACHE_VERSION}`;
 const IMAGE_CACHE = `images-${CACHE_VERSION}`;
