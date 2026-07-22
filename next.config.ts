@@ -17,8 +17,13 @@ const nextConfig: NextConfig = {
         protocol: 'https',
         hostname: 'via.placeholder.com',
       },
+      {
+        protocol: 'https',
+        hostname: '**.sslip.io',
+      },
     ],
   },
+
   eslint: {
     // ESLint will run during builds - warnings allowed, errors will fail build
     // Currently only has exhaustive-deps warnings which are acceptable

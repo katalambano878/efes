@@ -1,5 +1,5 @@
 // PWA Service Worker v3.0
-const CACHE_VERSION = 'sw-build-177534';
+const CACHE_VERSION = '__CACHE_VERSION__';
 const STATIC_CACHE = `static-${CACHE_VERSION}`;
 const DYNAMIC_CACHE = `dynamic-${CACHE_VERSION}`;
 const IMAGE_CACHE = `images-${CACHE_VERSION}`;
@@ -86,11 +86,19 @@ self.addEventListener('fetch', (event) => {
   // Skip admin routes
   if (url.pathname.startsWith('/admin')) return;
 
+  // Never intercept plain-PG storage or Next image optimizer — let the network handle them.
+  // Intercepting these caused "Image unavailable" placeholders after Supabase → /storage/ cutover.
+  if (
+    url.pathname.startsWith('/storage/') ||
+    url.pathname.startsWith('/_next/image')
+  ) {
+    return;
+  }
+
   // Strategy: Images - Cache First (long-lived)
   if (
     request.destination === 'image' ||
-    url.pathname.match(/\.(png|jpg|jpeg|gif|webp|svg|ico)$/) ||
-    url.hostname.includes('supabase.co') && url.pathname.includes('/storage/')
+    url.pathname.match(/\.(png|jpg|jpeg|gif|webp|svg|ico)$/)
   ) {
     event.respondWith(
       caches.open(IMAGE_CACHE).then((cache) => {
@@ -103,10 +111,16 @@ self.addEventListener('fetch', (event) => {
             }
             return response;
           }).catch(() => {
-            // Return a placeholder for failed images
+            // Transparent 1x1 — do not paint "Image unavailable" over real failures
             return new Response(
-              '<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200"><rect fill="#f3f4f6" width="200" height="200"/><text fill="#9ca3af" font-family="sans-serif" font-size="14" text-anchor="middle" x="100" y="105">Image unavailable</text></svg>',
-              { headers: { 'Content-Type': 'image/svg+xml' } }
+              new Uint8Array([
+                0x47, 0x49, 0x46, 0x38, 0x39, 0x61, 0x01, 0x00, 0x01, 0x00,
+                0x80, 0x00, 0x00, 0xff, 0xff, 0xff, 0x00, 0x00, 0x00, 0x21,
+                0xf9, 0x04, 0x01, 0x00, 0x00, 0x00, 0x00, 0x2c, 0x00, 0x00,
+                0x00, 0x00, 0x01, 0x00, 0x01, 0x00, 0x00, 0x02, 0x02, 0x44,
+                0x01, 0x00, 0x3b,
+              ]),
+              { headers: { 'Content-Type': 'image/gif' } }
             );
           });
         });
