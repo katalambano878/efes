@@ -69,3 +69,11 @@ env/
 *.tar
 *.tar.gz
 *.7z
+
+# Migration dumps (never commit)
+migration-artifacts/dumps/
+migration-artifacts/storage/
+.env.staging
+
+# Supabase CLI temp
+supabase/.temp/
