@@ -12,11 +12,13 @@
 //     .upsert(row|rows, { onConflict })
 //     .delete()
 //     .eq/.neq/.gt/.gte/.lt/.lte/.like/.ilike/.is/.in
+//     .contains(col, jsonObj)              -- jsonb @>
 //     .or('a.eq.x,b.ilike.%y%')
 //     .not('col','in','(a,b)')  .not('col','is',null)
 //     .filter(col, op, val)
 //     .order(col, { ascending, nullsFirst })  .limit(n)  .range(a,b)
 //     .single()  .maybeSingle()
+//   Relation filters: .eq('orders.status','paid') / .in('categories.slug',[...])
 //   await <builder>  ->  { data, error, count }
 //
 // Embeds are resolved with a second batched query per relationship (matching
@@ -40,7 +42,7 @@ type Row = Record<string, any>;
 type Op = "eq" | "neq" | "gt" | "gte" | "lt" | "lte" | "like" | "ilike" | "is" | "in";
 
 interface Filter {
-  kind: "cmp" | "in" | "is" | "or" | "notIn" | "notIs" | "raw";
+  kind: "cmp" | "in" | "is" | "or" | "notIn" | "notIs" | "contains" | "raw";
   col?: string;
   op?: string;
   value?: any;
@@ -66,6 +68,7 @@ interface EmbedSpec {
   alias: string; // property name on the result object
   table: string; // related table
   fkColumn?: string; // fk column on the owning row (forward embeds)
+  inner?: boolean; // PostgREST !inner — exclude parents with no match
   select: ParsedSelect;
 }
 
@@ -82,16 +85,18 @@ function ident(name: string): string {
 
 /** Cast uuid-like columns to text when the filter value is not a UUID. */
 function uuidSafeLeft(col: string, value: any): string {
-  const looksUuidCol = col === "id" || col.endsWith("_id");
+  // Bare column only — relation.column is handled via relationFilterClause.
+  const base = col.includes(".") ? col.split(".").pop()! : col;
+  const looksUuidCol = base === "id" || base.endsWith("_id");
   if (
     looksUuidCol &&
     typeof value === "string" &&
     value.length > 0 &&
     !UUID_RE.test(value)
   ) {
-    return `${ident(col)}::text`;
+    return `${ident(base)}::text`;
   }
-  return ident(col);
+  return ident(base);
 }
 
 // ---- select-string parser (handles nested embeds with parentheses) ---------
@@ -132,6 +137,7 @@ function parseSelect(sel: string): ParsedSelect {
           result.embeds.push({
             alias,
             table: tableName,
+            inner: constraint === "inner",
             select: parseSelect(inner),
           });
         } else {
@@ -329,6 +335,11 @@ class QueryBuilder implements PromiseLike<{ data: any; error: any; count: number
     this.filters.push({ kind: "in", col, values });
     return this;
   }
+  /** PostgREST `.contains(col, obj)` → jsonb `@>` containment. */
+  contains(col: string, value: any) {
+    this.filters.push({ kind: "contains", col, value });
+    return this;
+  }
   or(parts: string) {
     this.filters.push({ kind: "or", orParts: parts });
     return this;
@@ -347,6 +358,17 @@ class QueryBuilder implements PromiseLike<{ data: any; error: any; count: number
       this.filters.push({ kind: "in", col, values: vals });
     } else if (op === "is") {
       this.filters.push({ kind: "is", col, value: value === "null" ? null : value });
+    } else if (op === "cs" || op === "contains") {
+      // cs.{"a":1} or already-parsed object
+      let parsed = value;
+      if (typeof value === "string") {
+        try {
+          parsed = JSON.parse(value);
+        } catch {
+          parsed = value;
+        }
+      }
+      this.filters.push({ kind: "contains", col, value: parsed });
     } else {
       this.filters.push({ kind: "cmp", col, op, value });
     }
@@ -400,8 +422,13 @@ class QueryBuilder implements PromiseLike<{ data: any; error: any; count: number
             params.push(v);
             return `$${params.length}`;
           });
-          clauses.push(`${ident(f.col!)} IN (${ph.join(",")})`);
+          const inSql = `${this.colSql(f.col!)} IN (${ph.join(",")})`;
+          clauses.push(this.wrapRelation(f.col!, inSql));
         }
+      } else if (f.kind === "contains") {
+        params.push(JSON.stringify(f.value ?? {}));
+        const containsSql = `${this.colSql(f.col!)} @> $${params.length}::jsonb`;
+        clauses.push(this.wrapRelation(f.col!, containsSql));
       } else if (f.kind === "notIn") {
         const raw = String(f.value).replace(/^\(|\)$/g, "").trim();
         if (!raw) { clauses.push("true"); continue; }
@@ -410,7 +437,9 @@ class QueryBuilder implements PromiseLike<{ data: any; error: any; count: number
           params.push(v);
           return `$${params.length}`;
         });
-        clauses.push(`(${ident(f.col!)} IS NULL OR ${ident(f.col!)} NOT IN (${ph.join(",")}))`);
+        const left = this.colSql(f.col!);
+        const notInSql = `(${left} IS NULL OR ${left} NOT IN (${ph.join(",")}))`;
+        clauses.push(this.wrapRelation(f.col!, notInSql));
       } else if (f.kind === "is") {
         clauses.push(this.isClause(f.col!, f.value));
       } else if (f.kind === "notIs") {
@@ -420,14 +449,65 @@ class QueryBuilder implements PromiseLike<{ data: any; error: any; count: number
         clauses.push(this.orClause(f.orParts!, params));
       }
     }
+    // PostgREST !inner embeds: require a matching related row (not just non-null FK).
+    const parsed = parseSelect(this.selectStr);
+    for (const embed of parsed.embeds) {
+      if (!embed.inner) continue;
+      const fwd = (FK_MAP[this.table] || []).find((e) => e.foreignTable === embed.table);
+      if (fwd) {
+        clauses.push(
+          `${ident(fwd.column)} IN (SELECT ${ident(fwd.foreignColumn)} FROM ${ident(embed.table)})`
+        );
+      } else {
+        const rev = (FK_MAP[embed.table] || []).find((e) => e.foreignTable === this.table);
+        if (rev) {
+          clauses.push(
+            `EXISTS (SELECT 1 FROM ${ident(embed.table)} WHERE ${ident(rev.column)} = ${ident(this.table)}.${ident("id")})`
+          );
+        }
+      }
+    }
     return clauses.length ? `WHERE ${clauses.join(" AND ")}` : "";
   }
 
+  /** Bare column SQL (`"slug"`); strips a leading `relation.` if present. */
+  private colSql(col: string): string {
+    const base = col.includes(".") ? col.split(".").pop()! : col;
+    return ident(base);
+  }
+
+  /**
+   * PostgREST relation filters (`categories.slug`, `orders.payment_status`).
+   * Rewrites the predicate into an IN/EXISTS subquery via FK_MAP.
+   * Bare columns pass through unchanged.
+   */
+  private wrapRelation(col: string, predicateOnRelatedCol: string): string {
+    if (!col.includes(".")) return predicateOnRelatedCol;
+    const [relation, column] = col.split(".");
+    if (!PG_IDENT.test(relation) || !PG_IDENT.test(column)) {
+      throw new Error(`Unsafe SQL identifier: ${col}`);
+    }
+    const fwd = (FK_MAP[this.table] || []).find((e) => e.foreignTable === relation);
+    if (fwd) {
+      // products.category_id → categories.id  /  order_items.order_id → orders.id
+      return `${ident(fwd.column)} IN (SELECT ${ident(fwd.foreignColumn)} FROM ${ident(relation)} WHERE ${predicateOnRelatedCol})`;
+    }
+    const rev = (FK_MAP[relation] || []).find((e) => e.foreignTable === this.table);
+    if (rev) {
+      // Filter parent by child column (has-many)
+      return `EXISTS (SELECT 1 FROM ${ident(relation)} WHERE ${ident(rev.column)} = ${ident(this.table)}.${ident("id")} AND ${predicateOnRelatedCol})`;
+    }
+    throw new Error(`Cannot resolve relation filter: ${col}`);
+  }
+
   private isClause(col: string, value: any): string {
-    if (value === null || value === "null") return `${ident(col)} IS NULL`;
-    if (value === true || value === "true") return `${ident(col)} IS TRUE`;
-    if (value === false || value === "false") return `${ident(col)} IS FALSE`;
-    return `${ident(col)} IS NOT DISTINCT FROM ${value}`;
+    const left = this.colSql(col);
+    let clause: string;
+    if (value === null || value === "null") clause = `${left} IS NULL`;
+    else if (value === true || value === "true") clause = `${left} IS TRUE`;
+    else if (value === false || value === "false") clause = `${left} IS FALSE`;
+    else clause = `${left} IS NOT DISTINCT FROM ${value}`;
+    return this.wrapRelation(col, clause);
   }
 
   private cmpClause(col: string, op: string, value: any, params: any[]): string {
@@ -450,7 +530,8 @@ class QueryBuilder implements PromiseLike<{ data: any; error: any; count: number
     // (PostgREST coerces; we compare as text when the value is not a UUID).
     const left = uuidSafeLeft(col, value);
     const clause = `${left} ${o} $${params.length}`;
-    return negate ? `NOT (${clause})` : clause;
+    const wrapped = this.wrapRelation(col, clause);
+    return negate ? `NOT (${wrapped})` : wrapped;
   }
 
   // parse "col.op.val,col2.op2.val2" (PostgREST or-filter). Supports
@@ -1088,7 +1169,9 @@ export function applyPostgrestParams(
       const inner = value.replace(/^\(/, "").replace(/\)$/, "");
       const vals = inner.split(",").map((s) => coerce(s.trim()));
       qb.in(key, vals);
-    }     else {
+    } else if (op === "cs" || op === "contains") {
+      qb.filter(key, "cs", value);
+    } else {
       qb.filter(key, op, value);
     }
   }

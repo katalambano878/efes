@@ -80,8 +80,10 @@ export async function GET(
 
   const headers = new Headers(corsHeaders());
   headers.set("Content-Type", "application/json");
+  const rows = Array.isArray(result.data) ? result.data : result.data ? [result.data] : [];
   if (result.count != null) {
-    headers.set("Content-Range", `0-${Math.max((Array.isArray(result.data) ? result.data.length : 1) - 1, 0)}/${result.count}`);
+    if (rows.length === 0) headers.set("Content-Range", `*/${result.count}`);
+    else headers.set("Content-Range", `0-${rows.length - 1}/${result.count}`);
   }
 
   if (preferSingle(req)) {

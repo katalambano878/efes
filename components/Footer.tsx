@@ -45,11 +45,22 @@ export default function Footer() {
     }
 
     try {
-      // Newsletter simulation
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const res = await fetch('/api/newsletter/subscribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setSubmitStatus('error');
+        return;
+      }
       setSubmitStatus('success');
       setEmail('');
-    } catch (error) {
+      if (data?.message) {
+        // keep UI simple — success state already shown
+      }
+    } catch {
       setSubmitStatus('error');
     } finally {
       setIsSubmitting(false);

@@ -2,24 +2,29 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   images: {
-    minimumCacheTTL: 2592000, // Cache optimized images for 30 days
+    // Coolify/standalone: sharp + /.next/cache often break (empty 200 / EACCES).
+    // Serve originals until image optimizer + writable cache are healthy.
+    unoptimized: true,
+    minimumCacheTTL: 2592000,
     remotePatterns: [
       {
         protocol: 'https',
-        hostname: '*.supabase.co',
+        hostname: 'www.efescloset.com',
+        pathname: '/storage/v1/object/public/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'efescloset.com',
+        pathname: '/storage/v1/object/public/**',
+      },
+      {
+        protocol: 'https',
+        hostname: '**.sslip.io',
         pathname: '/storage/v1/object/public/**',
       },
       {
         protocol: 'https',
         hostname: 'images.unsplash.com',
-      },
-      {
-        protocol: 'https',
-        hostname: 'via.placeholder.com',
-      },
-      {
-        protocol: 'https',
-        hostname: '**.sslip.io',
       },
     ],
   },

@@ -510,6 +510,31 @@ ${emailButton('Pay Now — GH₵' + Number(total).toFixed(2), paymentUrl, '#d977
     }
 }
 
+export async function sendNewsletterWelcome(email: string) {
+    const promo = process.env.NEWSLETTER_PROMO_CODE?.trim();
+    const promoBlock = promo
+        ? `<div style="background-color:#f9fafb;border-radius:12px;padding:20px;margin:20px 0;text-align:center;">
+  <p style="color:#6b7280;font-size:12px;margin:0 0 6px;text-transform:uppercase;letter-spacing:0.5px;">Welcome offer</p>
+  <p style="color:#111827;font-size:22px;font-weight:700;margin:0;letter-spacing:1px;">${escapeHtml(promo)}</p>
+  <p style="color:#6b7280;font-size:13px;margin:8px 0 0;">Use this code at checkout</p>
+</div>`
+        : '';
+
+    await sendEmail({
+        to: email,
+        subject: `Welcome to ${BRAND.name}`,
+        html: emailLayout(`
+<div style="text-align:center;margin-bottom:24px;">
+  <h2 style="margin:0 0 4px;color:#111827;font-size:24px;">You're on the list</h2>
+  <p style="margin:0;color:#6b7280;font-size:15px;">Thanks for joining ${BRAND.name}.</p>
+</div>
+<p style="color:#374151;font-size:14px;line-height:1.7;margin:16px 0;">We'll send style drops, restocks, and exclusive offers — no spam.</p>
+${promoBlock}
+${emailButton('Shop now', `${BRAND.url}/shop`)}
+`, `Welcome to ${BRAND.name}`)
+    });
+}
+
 export async function sendContactMessage(data: { name: string, email: string, subject: string, message: string }) {
     const { name, email, subject, message } = data;
 

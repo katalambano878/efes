@@ -142,7 +142,7 @@ export async function POST(
   }
 
   if (slug === "logout") {
-    return NextResponse.json({}, { status: 204, headers: cors() });
+    return new NextResponse(null, { status: 204, headers: cors() });
   }
 
   if (slug === "recover") {
