@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { isPlainPostgres } from '@/lib/db/mode';
+import { compressImageBuffer } from '@/lib/image-compress';
 
 export const runtime = 'nodejs';
 
@@ -28,7 +30,7 @@ function getAccessToken(request: Request): string | null {
 }
 
 async function requireAdmin(request: Request): Promise<NextResponse | null> {
-  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+  if (!isPlainPostgres() && !process.env.SUPABASE_SERVICE_ROLE_KEY) {
     return NextResponse.json({ error: 'Server misconfiguration' }, { status: 503 });
   }
   const token = getAccessToken(request);
@@ -54,10 +56,19 @@ function extFromFile(file: File): string {
   return fromType || 'jpg';
 }
 
+function extForContentType(contentType: string, fallbackExt: string): string {
+  const ct = contentType.toLowerCase();
+  if (ct.includes('webp')) return 'webp';
+  if (ct.includes('png')) return 'png';
+  if (ct.includes('jpeg') || ct.includes('jpg')) return 'jpg';
+  if (ct.includes('gif')) return 'gif';
+  return fallbackExt;
+}
+
 /**
  * POST /api/admin/upload
  * Body: multipart/form-data with field "file" (optional "bucket", default "products"; optional "folder").
- * Images are expected to be compressed client-side before upload (see lib/client-image.ts).
+ * Images are compressed server-side before storage upload.
  * Returns { url: string } public URL. Uses service role so storage RLS is bypassed.
  */
 export async function POST(request: Request) {
@@ -75,14 +86,21 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Missing file' }, { status: 400 });
     }
 
-    const ext = extFromFile(file);
+    const rawExt = extFromFile(file);
+    let contentType = file.type || 'application/octet-stream';
+    const raw = Buffer.from(await file.arrayBuffer());
+    const compressed = await compressImageBuffer(raw, contentType);
+    const buffer = Buffer.from(compressed.buffer);
+    contentType = compressed.contentType;
+
+    const ext = extForContentType(contentType, rawExt);
     const baseName = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
     const path = folder ? `${folder}/${baseName}` : baseName;
 
-    const { error } = await supabaseAdmin.storage.from(bucket).upload(path, file, {
+    const { error } = await supabaseAdmin.storage.from(bucket).upload(path, buffer, {
       cacheControl: '31536000',
       upsert: false,
-      contentType: file.type || 'application/octet-stream',
+      contentType,
     });
 
     if (error) {

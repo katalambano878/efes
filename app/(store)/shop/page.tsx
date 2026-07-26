@@ -10,7 +10,7 @@ export default function ShopPage() {
         pageTitle="Shop All Products"
         heroTitle="Shop All Products"
         heroSubtitle="Discover our curated collection of premium goods"
-        heroImage="/Whisk_hvmy5ado3udzhvwytmdz0ewl5etn00iz5qwotyw.jpeg"
+        heroImage="/Whisk_hvmy5ado3udzhvwytmdz0ewl5etn00iz5qwotyw.webp"
       />
     </Suspense>
   );

@@ -33,7 +33,7 @@ export default function WishlistPage() {
 
   return (
     <main className="min-h-screen bg-gray-50">
-      <PageHero title="My Wishlist" image="/Whisk_5kdmzygo0igm0imytqgoxiwl1mmn00so4qmztmd.jpeg" />
+      <PageHero title="My Wishlist" image="/Whisk_5kdmzygo0igm0imytqgoxiwl1mmn00so4qmztmd.webp" />
 
       <section className="py-8 bg-white border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">

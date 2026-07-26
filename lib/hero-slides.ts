@@ -27,7 +27,7 @@ export const DEFAULT_HERO_BANNER_CONFIG: HeroBannerConfig = {
   secondaryButtonLink: '/about',
   slides: [
     {
-      image: '/hero0.png',
+      image: '/hero0.webp',
       tagline: 'Visit Our Boutique',
       headline: 'Style Meets Quality',
       subheadline:
@@ -36,7 +36,7 @@ export const DEFAULT_HERO_BANNER_CONFIG: HeroBannerConfig = {
       primaryButtonLink: '/shop',
     },
     {
-      image: '/hero1.png',
+      image: '/hero1.webp',
       tagline: 'The New Standard',
       headline: 'Elevate Your Wardrobe',
       subheadline: 'Discover uncompromising quality and timeless elegance at our Dansoman Sahara boutique.',
@@ -44,7 +44,7 @@ export const DEFAULT_HERO_BANNER_CONFIG: HeroBannerConfig = {
       primaryButtonLink: '/shop',
     },
     {
-      image: '/hero2.png',
+      image: '/hero2.webp',
       tagline: 'Curated Elegance',
       headline: 'Welcome to Efescloset',
       subheadline:
@@ -53,7 +53,7 @@ export const DEFAULT_HERO_BANNER_CONFIG: HeroBannerConfig = {
       primaryButtonLink: '/categories',
     },
     {
-      image: '/hero3.jpeg',
+      image: '/hero3.webp',
       tagline: 'Trending Now',
       headline: 'Define Your Signature Style',
       subheadline:
@@ -113,7 +113,7 @@ export function parseHeroBannerConfig(raw: string | null | undefined): HeroBanne
 
 export function emptyHeroSlide(): HeroSlide {
   return {
-    image: '/hero0.png',
+    image: '/hero0.webp',
     video: '',
     tagline: '',
     headline: '',

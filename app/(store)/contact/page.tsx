@@ -152,7 +152,7 @@ export default function ContactPage() {
       <PageHero
         title="Get In Touch"
         subtitle="Have a question or need assistance? Our friendly team is here to help."
-        image="/Whisk_hnwo3gtm4ywy0ktztgdnifwlyedn00inhnmytat.jpeg"
+        image="/Whisk_hnwo3gtm4ywy0ktztgdnifwlyedn00inhnmytat.webp"
       />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">

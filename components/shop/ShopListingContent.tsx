@@ -128,7 +128,11 @@ export default function ShopListingContent({
               }
             }
             const images = Array.isArray(p.product_images) ? [...p.product_images].sort((a: any, b: any) => (a.position ?? 0) - (b.position ?? 0)) : [];
-            const firstImageUrl = images.find((img: any) => Number(img.position) === 0)?.url || images[0]?.url || 'https://via.placeholder.com/800x800?text=No+Image';
+            const fromGallery =
+              images.find((img: any) => Number(img.position) === 0)?.url || images[0]?.url || '';
+            const fromVariant =
+              variants.find((v: any) => v.image_url)?.image_url || '';
+            const firstImageUrl = fromGallery || fromVariant || '/logo-efes.png';
             const isPreorder = p.metadata?.availability_type === 'preorder';
 
             return {

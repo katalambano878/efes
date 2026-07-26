@@ -148,7 +148,7 @@ export default function Home() {
         <div className="absolute inset-0 z-0">
           {slides.map((slide, index) => {
             const hasVideo = !!(slide.video && slide.video.trim());
-            const posterSrc = (slide.image && slide.image.trim()) || '/hero0.png';
+            const posterSrc = (slide.image && slide.image.trim()) || '/hero0.webp';
             const isActive = index === activeHeroIndex;
             return (
               <div

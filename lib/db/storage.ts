@@ -7,6 +7,7 @@
 import { createHmac } from "crypto";
 import { promises as fs } from "fs";
 import path from "path";
+import { compressImageBuffer, sniffImageContentType } from "@/lib/image-compress";
 
 const STORAGE_ROOT =
   process.env.STORAGE_ROOT || path.join(process.cwd(), ".storage");
@@ -64,13 +65,15 @@ export async function readObject(
   try {
     const full = safeJoin(bucket, objectPath);
     const bytes = await fs.readFile(full);
-    let contentType = "application/octet-stream";
+    const sniffed = sniffImageContentType(bytes);
+    let contentType = guessContentType(objectPath);
     try {
       const meta = JSON.parse(await fs.readFile(full + ".meta.json", "utf8"));
-      if (meta.contentType) contentType = meta.contentType;
+      if (meta.contentType && !sniffed) contentType = String(meta.contentType);
     } catch {
-      contentType = guessContentType(objectPath);
+      /* extension guess */
     }
+    if (sniffed) contentType = sniffed;
     return { bytes, contentType };
   } catch {
     return null;
@@ -125,13 +128,29 @@ export function createStorageClient(): StorageClient {
             } else {
               buf = Buffer.from(data as any);
             }
-            await fs.writeFile(full, buf);
-            if (opts?.contentType) {
-              await fs.writeFile(
-                full + ".meta.json",
-                JSON.stringify({ contentType: opts.contentType })
-              );
+
+            const sniffedIn = sniffImageContentType(buf);
+            let contentType =
+              sniffedIn ||
+              opts?.contentType ||
+              guessContentType(objectPath);
+
+            if (
+              contentType.startsWith("image/") &&
+              !contentType.includes("gif") &&
+              !contentType.includes("svg")
+            ) {
+              const compressed = await compressImageBuffer(buf, contentType);
+              buf = compressed.buffer;
+              contentType =
+                sniffImageContentType(buf) || compressed.contentType;
             }
+
+            await fs.writeFile(full, buf);
+            await fs.writeFile(
+              full + ".meta.json",
+              JSON.stringify({ contentType })
+            );
             return { data: { path: objectPath }, error: null };
           } catch (e: any) {
             return { data: null, error: { message: e.message } };

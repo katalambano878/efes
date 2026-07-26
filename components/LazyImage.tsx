@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
 
 interface LazyImageProps {
@@ -14,6 +14,12 @@ interface LazyImageProps {
   sizes?: string;
 }
 
+function isStorageSrc(url: string): boolean {
+  if (!url) return false;
+  if (url.startsWith('/storage/')) return true;
+  return url.includes('/storage/v1/object/');
+}
+
 export default function LazyImage({
   src,
   alt,
@@ -24,8 +30,24 @@ export default function LazyImage({
   onLoad,
   sizes = '(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw'
 }: LazyImageProps) {
-  const [isLoaded, setIsLoaded] = useState(false);
+  const storageSrc = isStorageSrc(src);
+  const [isLoaded, setIsLoaded] = useState(storageSrc);
   const [hasError, setHasError] = useState(false);
+  const [displaySrc, setDisplaySrc] = useState(src);
+  const retriedRef = useRef(false);
+
+  useEffect(() => {
+    setDisplaySrc(src);
+    setHasError(false);
+    retriedRef.current = false;
+    setIsLoaded(isStorageSrc(src));
+  }, [src]);
+
+  useEffect(() => {
+    if (isLoaded || hasError) return;
+    const t = window.setTimeout(() => setIsLoaded(true), 2000);
+    return () => window.clearTimeout(t);
+  }, [displaySrc, isLoaded, hasError]);
 
   const handleLoad = () => {
     setIsLoaded(true);
@@ -33,18 +55,25 @@ export default function LazyImage({
   };
 
   const handleError = () => {
+    if (isStorageSrc(displaySrc) && !retriedRef.current) {
+      retriedRef.current = true;
+      setDisplaySrc((prev) => {
+        const sep = prev.includes('?') ? '&' : '?';
+        return `${prev}${sep}_retry=${Date.now()}`;
+      });
+      return;
+    }
     setHasError(true);
     setIsLoaded(true);
     onLoad?.();
   };
 
-  const resolvedSrc = src?.includes('via.placeholder.com') ? '' : src;
-
-  // Same-origin storage — native <img> (next/image + SW have broken these after cutover)
-  const useNativeImg = Boolean(
-    resolvedSrc?.startsWith('/storage/') ||
-      resolvedSrc?.includes('/storage/v1/object/')
-  );
+  const resolvedSrc = displaySrc?.includes('via.placeholder.com') ? '' : displaySrc;
+  const useNativeImg = isStorageSrc(resolvedSrc);
+  const fillParent =
+    className.includes('h-full') ||
+    className.includes('w-full') ||
+    useNativeImg;
 
   if (!resolvedSrc || hasError) {
     return (
@@ -54,10 +83,12 @@ export default function LazyImage({
     );
   }
 
+  const opacityClass = isLoaded ? 'opacity-100' : 'opacity-0';
+
   return (
-    <div className={`relative overflow-hidden ${className}`} style={{ width, height }}>
+    <div className={`relative overflow-hidden ${fillParent ? 'w-full h-full' : ''} ${className}`} style={fillParent ? undefined : { width, height }}>
       {!isLoaded && (
-        <div className="absolute inset-0 bg-gray-200 animate-pulse z-10"></div>
+        <div className="absolute inset-0 bg-gray-200 animate-pulse z-10 pointer-events-none"></div>
       )}
       {useNativeImg ? (
         // eslint-disable-next-line @next/next/no-img-element
@@ -66,7 +97,7 @@ export default function LazyImage({
           alt={alt}
           loading={priority ? 'eager' : 'lazy'}
           decoding="async"
-          className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-300 ${isLoaded ? 'opacity-100' : 'opacity-0'}`}
+          className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-300 ${opacityClass}`}
           onLoad={handleLoad}
           onError={handleError}
         />
@@ -74,9 +105,11 @@ export default function LazyImage({
         <Image
           src={resolvedSrc}
           alt={alt}
-          fill
+          fill={fillParent}
+          width={fillParent ? undefined : width}
+          height={fillParent ? undefined : height}
           sizes={sizes}
-          className={`object-cover transition-opacity duration-300 ${isLoaded ? 'opacity-100' : 'opacity-0'}`}
+          className={`object-cover transition-opacity duration-300 ${opacityClass}`}
           onLoad={handleLoad}
           onError={handleError}
           priority={priority}

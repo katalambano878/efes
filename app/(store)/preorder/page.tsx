@@ -10,7 +10,7 @@ export default function PreorderPage() {
         pageTitle="Preorder"
         heroTitle="Preorder"
         heroSubtitle="Reserve pieces before they land in store. Estimated shipping dates are shown on each product."
-        heroImage="/Whisk_hvmy5ado3udzhvwytmdz0ewl5etn00iz5qwotyw.jpeg"
+        heroImage="/Whisk_hvmy5ado3udzhvwytmdz0ewl5etn00iz5qwotyw.webp"
         availability="preorder"
       />
     </Suspense>

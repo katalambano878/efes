@@ -69,7 +69,7 @@ export default async function CategoriesPage() {
       <PageHero
         title="Shop by Category"
         subtitle="Explore our curated collections and find exactly what you're looking for"
-        image="/Whisk_wqwy1yto2kdm5izmtmwzxktl3mjn00ynyidmtyw.jpeg"
+        image="/Whisk_wqwy1yto2kdm5izmtmwzxktl3mjn00ynyidmtyw.webp"
       />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">

@@ -1,5 +1,5 @@
 // Service Worker — network-first pages; no HTML shell cache (playbook §16)
-const CACHE_VERSION = 'sw-v2.5-efes-20260725';
+const CACHE_VERSION = 'sw-v2.6-efes-images-20260726';
 const STATIC_CACHE = `static-${CACHE_VERSION}`;
 const IMAGE_CACHE = `images-${CACHE_VERSION}`;
 const API_CACHE = `api-${CACHE_VERSION}`;

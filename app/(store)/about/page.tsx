@@ -19,7 +19,7 @@ export default function AboutPage() {
         <div className="absolute inset-0 z-0 bg-black">
           <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/40 to-black z-10" />
           <img
-            src="/Whisk_xgzymltmlzgnirtotczy0ewlzywn00cz0umztqg.jpeg"
+            src="/Whisk_xgzymltmlzgnirtotczy0ewlzywn00cz0umztqg.webp"
             alt="Store"
             className="w-full h-full object-cover animate-pulse-glow"
             style={{ animationDuration: '8s' }}
@@ -54,7 +54,7 @@ export default function AboutPage() {
           <div className="lg:col-span-5 lg:col-start-2 order-2 lg:order-1 relative">
             <AnimatedSection animation="fade-right">
               <div className="aspect-[4/5] overflow-hidden rounded-t-full shadow-2xl relative isolate bg-gray-100">
-                <img src="/Whisk_yego2igz1ujy2immtujz4gtl2ito00inhldntug.jpeg" alt="" className="w-full h-full object-cover filter contrast-125" />
+                <img src="/Whisk_yego2igz1ujy2immtujz4gtl2ito00inhldntug.webp" alt="" className="w-full h-full object-cover filter contrast-125" />
                 <div className="absolute inset-0 bg-gradient-to-tr from-gray-900/60 to-transparent z-10"></div>
                 <div className="absolute bottom-10 left-1/2 -translate-x-1/2 z-20 text-center w-full">
                   <span className="bg-white/90 backdrop-blur-md text-gray-900 text-xs font-bold uppercase tracking-[0.2em] px-6 py-3 rounded-full shadow-lg">Our Founder</span>
