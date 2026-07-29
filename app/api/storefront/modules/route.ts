@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { requireDbBackend } from '@/lib/api-gate';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 
 /**
@@ -8,12 +9,8 @@ import { supabaseAdmin } from '@/lib/supabase-admin';
  * for the storefront (e.g. maintenance mode, AI chat).
  */
 export async function GET() {
-  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
-    return NextResponse.json(
-      { error: 'Server misconfiguration' },
-      { status: 503 },
-    );
-  }
+  const gate = requireDbBackend();
+  if (gate) return gate;
 
   try {
     const { data, error } = await supabaseAdmin

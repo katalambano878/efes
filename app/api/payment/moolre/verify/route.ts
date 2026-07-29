@@ -24,7 +24,8 @@ export async function POST(req: Request) {
             );
         }
 
-        const { orderNumber } = await req.json();
+        const body = await req.json();
+        const { orderNumber, email } = body;
 
         if (!orderNumber || typeof orderNumber !== 'string') {
             return NextResponse.json({ success: false, message: 'Missing or invalid orderNumber' }, { status: 400 });
@@ -35,9 +36,14 @@ export async function POST(req: Request) {
             return NextResponse.json({ success: false, message: 'Invalid order number format' }, { status: 400 });
         }
 
+        const emailNorm = typeof email === 'string' ? email.trim().toLowerCase() : '';
+        if (!emailNorm || !emailNorm.includes('@')) {
+            return NextResponse.json({ success: false, message: 'Email is required' }, { status: 400 });
+        }
+
         console.log('[Verify] Checking payment for:', orderNumber);
 
-        // 1. Check current order status
+        // 1. Check current order status (ownership via email — parity with Hubtel)
         const { data: order, error: fetchError } = await supabaseAdmin
             .from('orders')
             .select('id, order_number, payment_status, status, total, email, phone, shipping_address, metadata')
@@ -46,6 +52,10 @@ export async function POST(req: Request) {
 
         if (fetchError || !order) {
             console.error('[Verify] Order not found:', orderNumber);
+            return NextResponse.json({ success: false, message: 'Order not found' }, { status: 404 });
+        }
+
+        if (String(order.email || '').trim().toLowerCase() !== emailNorm) {
             return NextResponse.json({ success: false, message: 'Order not found' }, { status: 404 });
         }
 

@@ -1,11 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-
-const supabaseAdmin = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { autoRefreshToken: false, persistSession: false } }
-);
+import { supabaseAdmin } from '@/lib/supabase-admin';
 
 async function getAuthUser(req: NextRequest) {
     const token = req.cookies.get('sb-access-token')?.value;
@@ -38,7 +32,7 @@ export async function GET(req: NextRequest) {
                 supabaseAdmin.from('orders')
                     .select('id', { count: 'exact' })
                     .in('status', ['processing', 'shipped'])
-                    .not('id', 'in', `(${(await supabaseAdmin.from('delivery_assignments').select('order_id').not('status', 'in', '("failed","returned")')).data?.map(a => a.order_id).join(',') || '00000000-0000-0000-0000-000000000000'})`),
+                    .not('id', 'in', `(${(await supabaseAdmin.from('delivery_assignments').select('order_id').not('status', 'in', '("failed","returned")')).data?.map((a: { order_id: string }) => a.order_id).join(',') || '00000000-0000-0000-0000-000000000000'})`),
                 supabaseAdmin.from('delivery_zones').select('id', { count: 'exact' }).eq('is_active', true),
             ]);
 
@@ -48,15 +42,17 @@ export async function GET(req: NextRequest) {
 
             const stats = {
                 totalAssignments: allAssignments.length,
-                activeDeliveries: allAssignments.filter(a => ['assigned', 'picked_up', 'in_transit'].includes(a.status)).length,
-                deliveredToday: todayData.filter(a => a.status === 'delivered').length,
-                failedToday: todayData.filter(a => a.status === 'failed').length,
+                activeDeliveries: allAssignments.filter((a: { status: string }) => ['assigned', 'picked_up', 'in_transit'].includes(a.status)).length,
+                deliveredToday: todayData.filter((a: { status: string }) => a.status === 'delivered').length,
+                failedToday: todayData.filter((a: { status: string }) => a.status === 'failed').length,
                 totalRiders: allRiders.length,
-                activeRiders: allRiders.filter(r => r.status === 'active').length,
-                onDeliveryRiders: allRiders.filter(r => r.status === 'on_delivery').length,
+                activeRiders: allRiders.filter((r: { status: string }) => r.status === 'active').length,
+                onDeliveryRiders: allRiders.filter((r: { status: string }) => r.status === 'on_delivery').length,
                 pendingOrders: pendingOrders.count || 0,
                 activeZones: zonesRes.count || 0,
-                todayRevenue: todayData.filter(a => a.status === 'delivered').reduce((sum, a) => sum + (a.delivery_fee || 0), 0),
+                todayRevenue: todayData
+                  .filter((a: { status: string; delivery_fee?: number }) => a.status === 'delivered')
+                  .reduce((sum: number, a: { delivery_fee?: number }) => sum + (a.delivery_fee || 0), 0),
             };
 
             return NextResponse.json({ stats });
@@ -82,7 +78,7 @@ export async function GET(req: NextRequest) {
                 .select('order_id')
                 .not('status', 'in', '("failed","returned")');
 
-            const excludeIds = (assignedOrderIds || []).map(a => a.order_id);
+            const excludeIds = (assignedOrderIds || []).map((a: { order_id: string }) => a.order_id);
 
             let query = supabaseAdmin
                 .from('orders')

@@ -244,7 +244,9 @@ export default function CheckoutPage() {
 
       // 6. Clear Cart & Redirect (For COD)
       clearCart();
-      router.push(`/order-success?order=${orderNumber}`);
+      router.push(
+        `/order-success?order=${encodeURIComponent(orderNumber)}&email=${encodeURIComponent(shippingData.email || '')}`
+      );
 
     } catch (err: any) {
       console.error('Checkout error:', err);

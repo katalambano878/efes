@@ -3,39 +3,42 @@
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { Suspense, useState, useEffect } from 'react';
-import { supabase } from '@/lib/supabase';
+import { money } from '@/lib/format-money';
 
 function OrderSuccessContent() {
   const searchParams = useSearchParams();
   const orderNumber = searchParams.get('order');
+  const emailParam = searchParams.get('email') || '';
   const paymentSuccess = searchParams.get('payment_success');
   const [order, setOrder] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [showConfetti, setShowConfetti] = useState(true);
   const [verifying, setVerifying] = useState(false);
 
+  async function lookupOrder(orderNum: string, email: string) {
+    const res = await fetch('/api/storefront/orders/lookup', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ orderNumber: orderNum, email }),
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data.order || null;
+  }
+
   useEffect(() => {
     async function fetchOrder() {
-      if (!orderNumber) {
+      if (!orderNumber || !emailParam) {
         setLoading(false);
         return;
       }
 
       try {
-        const { data: orderData, error } = await supabase
-          .from('orders')
-          .select(`
-                    *,
-                    order_items (*)
-                `)
-          .eq('order_number', orderNumber)
-          .single();
-
-        if (error) throw error;
+        const orderData = await lookupOrder(orderNumber, emailParam);
+        if (!orderData) throw new Error('not found');
         setOrder(orderData);
 
-        // If redirected from payment and order is still pending, try to verify
-        if (paymentSuccess === 'true' && orderData && orderData.payment_status !== 'paid') {
+        if (paymentSuccess === 'true' && orderData.payment_status !== 'paid') {
           verifyPayment(orderNumber, orderData);
         }
       } catch (err) {
@@ -45,22 +48,14 @@ function OrderSuccessContent() {
       }
     }
     fetchOrder();
-  }, [orderNumber, paymentSuccess]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orderNumber, emailParam, paymentSuccess]);
 
-  // Payment verification — route to Hubtel or Moolre based on order payment method
   const verifyPayment = async (orderNum: string, initialOrder: any) => {
     setVerifying(true);
+    await new Promise((resolve) => setTimeout(resolve, 3000));
 
-    // Wait 3 seconds to give the callback a chance to process first
-    await new Promise(resolve => setTimeout(resolve, 3000));
-
-    // Re-fetch order to check if callback already updated it
-    const { data: refreshed } = await supabase
-      .from('orders')
-      .select('*, order_items (*)')
-      .eq('order_number', orderNum)
-      .single();
-
+    const refreshed = await lookupOrder(orderNum, emailParam || initialOrder?.email);
     if (refreshed?.payment_status === 'paid') {
       setOrder(refreshed);
       setVerifying(false);
@@ -80,26 +75,18 @@ function OrderSuccessContent() {
       gateway === 'hubtel' ? '/api/payment/hubtel/verify' : '/api/payment/moolre/verify';
 
     try {
-      const payload =
-        gateway === 'hubtel'
-          ? { orderNumber: orderNum, email: refreshed?.email || initialOrder?.email }
-          : { orderNumber: orderNum };
-
       const res = await fetch(verifyEndpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
+        body: JSON.stringify({
+          orderNumber: orderNum,
+          email: emailParam || refreshed?.email || initialOrder?.email,
+        }),
       });
 
       const result = await res.json();
-      console.log('Payment verification result:', result);
-
       if (result.success && result.payment_status === 'paid') {
-        const { data: updated } = await supabase
-          .from('orders')
-          .select('*, order_items (*)')
-          .eq('order_number', orderNum)
-          .single();
+        const updated = await lookupOrder(orderNum, emailParam || initialOrder?.email);
         if (updated) setOrder(updated);
       }
     } catch (err) {
@@ -120,14 +107,20 @@ function OrderSuccessContent() {
     );
   }
 
-  // Use a fallback or nice error if order not found
   if (!order) {
     return (
       <main className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-center">
+        <div className="text-center max-w-md px-4">
           <i className="ri-error-warning-line text-4xl text-red-500 mb-4 block"></i>
           <h1 className="text-2xl font-bold text-gray-900 mb-2">Order Not Found</h1>
-          <p className="text-gray-600 mb-6">We couldn't locate the order details.</p>
+          <p className="text-gray-600 mb-6">
+            {!emailParam
+              ? 'Open this page from checkout, or use Order Tracking with your order number and email.'
+              : "We couldn't locate the order for that email."}
+          </p>
+          <Link href="/order-tracking" className="text-gray-900 font-semibold hover:underline mr-4">
+            Track order
+          </Link>
           <Link href="/shop" className="text-gray-900 font-semibold hover:underline">
             Return to Shop
           </Link>
@@ -265,7 +258,7 @@ function OrderSuccessContent() {
                   <div key={item.id} className="flex items-center space-x-4">
                     <div className="w-20 h-20 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0 border border-gray-200">
                       <img
-                        src={item.metadata?.image || 'https://via.placeholder.com/150'}
+                        src={item.metadata?.image || '/logo-efes.png'}
                         alt={item.product_name}
                         className="w-full h-full object-cover object-center"
                       />
@@ -282,23 +275,23 @@ function OrderSuccessContent() {
                         </p>
                       )}
                     </div>
-                    <p className="font-bold text-gray-900">GH₵{item.unit_price.toFixed(2)}</p>
+                    <p className="font-bold text-gray-900">GH₵{money(item.unit_price)}</p>
                   </div>
                 ))}
               </div>
               <div className="border-t border-gray-200 mt-4 pt-4">
                 <div className="flex justify-between text-sm text-gray-600 mb-2">
                   <span>Subtotal</span>
-                  <span>GH₵{order.subtotal.toFixed(2)}</span>
+                  <span>GH₵{money(order.subtotal)}</span>
                 </div>
                 <div className="flex justify-between text-sm text-gray-600 mb-2">
                   <span>Shipping</span>
-                  <span>GH₵{order.shipping_total.toFixed(2)}</span>
+                  <span>GH₵{money(order.shipping_total)}</span>
                 </div>
 
                 <div className="flex justify-between text-xl font-bold text-gray-900 border-t border-gray-200 pt-2">
                   <span>Total Paid</span>
-                  <span>GH₵{order.total.toFixed(2)}</span>
+                  <span>GH₵{money(order.total)}</span>
                 </div>
               </div>
             </div>

@@ -1,5 +1,5 @@
 import { Resend } from 'resend';
-import { supabase } from '@/lib/supabase';
+import { supabaseAdmin } from '@/lib/supabase-admin';
 import { escapeHtml } from '@/lib/sanitize';
 
 const resend = new Resend(process.env.RESEND_API_KEY || 'missing_api_key');
@@ -186,6 +186,36 @@ export async function sendSMS({ to, message }: { to: string; message: string }) 
 export async function sendOrderConfirmation(order: any) {
     const { id, email, phone: orderPhone, shipping_address, total, created_at, order_number, metadata } = order;
 
+    // Idempotency: skip if confirmation already sent (callback + verify race)
+    if (metadata?.confirmation_sent_at) {
+        console.log(`[Notification] Skipping duplicate confirmation for ${order_number}`);
+        return;
+    }
+    if (id) {
+        try {
+            const { data: fresh } = await supabaseAdmin
+                .from('orders')
+                .select('metadata')
+                .eq('id', id)
+                .maybeSingle();
+            if (fresh?.metadata?.confirmation_sent_at) {
+                console.log(`[Notification] Skipping duplicate confirmation for ${order_number}`);
+                return;
+            }
+            await supabaseAdmin
+                .from('orders')
+                .update({
+                    metadata: {
+                        ...(fresh?.metadata || metadata || {}),
+                        confirmation_sent_at: new Date().toISOString(),
+                    },
+                })
+                .eq('id', id);
+        } catch (e: any) {
+            console.warn('[Notification] confirmation lock failed:', e?.message);
+        }
+    }
+
     const baseUrl = (process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000').replace(/\/+$/, '');
 
     // Build customer name from available sources
@@ -219,7 +249,7 @@ export async function sendOrderConfirmation(order: any) {
     // Fetch order items to get preorder_shipping info
     let shippingNotes: string[] = [];
     try {
-        const { data: items } = await supabase
+        const { data: items } = await supabaseAdmin
             .from('order_items')
             .select('product_name, metadata')
             .eq('order_id', id);

@@ -356,7 +356,7 @@ export default function Home() {
                     name={product.name}
                     price={product.price}
                     originalPrice={product.compare_at_price}
-                    image={(Array.isArray(product.product_images) ? [...product.product_images].sort((a: any, b: any) => (a.position ?? 0) - (b.position ?? 0))[0]?.url : product.product_images?.[0]?.url) || 'https://via.placeholder.com/400x500'}
+                    image={(Array.isArray(product.product_images) ? [...product.product_images].sort((a: any, b: any) => (a.position ?? 0) - (b.position ?? 0))[0]?.url : product.product_images?.[0]?.url) || '/logo-efes.png'}
                     rating={product.rating_avg || 5}
                     reviewCount={product.review_count || 0}
                     badge={product.featured ? 'Featured' : undefined}

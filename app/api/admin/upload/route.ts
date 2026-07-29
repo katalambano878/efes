@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
+import { requireDbBackend } from '@/lib/api-gate';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { isPlainPostgres } from '@/lib/db/mode';
 import { compressImageBuffer } from '@/lib/image-compress';
 
 export const runtime = 'nodejs';
@@ -30,9 +30,8 @@ function getAccessToken(request: Request): string | null {
 }
 
 async function requireAdmin(request: Request): Promise<NextResponse | null> {
-  if (!isPlainPostgres() && !process.env.SUPABASE_SERVICE_ROLE_KEY) {
-    return NextResponse.json({ error: 'Server misconfiguration' }, { status: 503 });
-  }
+  const gate = requireDbBackend();
+  if (gate) return gate;
   const token = getAccessToken(request);
   if (!token) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
   const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(token);

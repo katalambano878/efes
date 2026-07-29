@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { requireDbBackend } from '@/lib/api-gate';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 
 // Simple in-memory cache
@@ -19,9 +20,8 @@ export async function GET(request: Request) {
         });
     }
 
-    if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
-        return NextResponse.json({ error: 'Server misconfiguration' }, { status: 503 });
-    }
+    const gate = requireDbBackend();
+    if (gate) return gate;
 
     try {
         let query = supabaseAdmin

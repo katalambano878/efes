@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
+import { requireDbBackend } from '@/lib/api-gate';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { isPlainPostgres } from '@/lib/db/mode';
 
 /**
  * GET /api/storefront/shop
@@ -8,9 +8,8 @@ import { isPlainPostgres } from '@/lib/db/mode';
  * Query params: search, categorySlugs (comma-separated or 'all'), priceMin, priceMax, rating, sortBy, page, limit
  */
 export async function GET(request: Request) {
-  if (!isPlainPostgres() && !process.env.SUPABASE_SERVICE_ROLE_KEY) {
-    return NextResponse.json({ error: 'Server misconfiguration' }, { status: 503 });
-  }
+  const gate = requireDbBackend();
+  if (gate) return gate;
 
   const { searchParams } = new URL(request.url);
   const search = searchParams.get('search') || '';

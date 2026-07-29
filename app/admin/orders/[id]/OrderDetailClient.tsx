@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import FraudDetectionAlert from '@/components/FraudDetectionAlert';
+import { money } from '@/lib/format-money';
 
 interface OrderDetailClientProps {
   orderId: string;
@@ -329,7 +330,7 @@ export default function OrderDetailClient({ orderId }: OrderDetailClientProps) {
                     <td className="py-2 px-2 font-medium">{item.product_name}</td>
                     <td className="py-2 px-2 text-sm">{item.variant_name || '-'}</td>
                     <td className="py-2 px-2 text-center font-bold">{item.quantity}</td>
-                    <td className="py-2 px-2 text-right">GH₵ {item.unit_price?.toFixed(2)}</td>
+                    <td className="py-2 px-2 text-right">GH₵ {money(item.unit_price)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -344,9 +345,9 @@ export default function OrderDetailClient({ orderId }: OrderDetailClientProps) {
               {trackingNumber && <p><span className="font-semibold">Tracking #:</span> {trackingNumber}</p>}
             </div>
             <div className="text-right">
-              <p>Subtotal: GH₵ {order?.subtotal?.toFixed(2)}</p>
-              <p>Shipping: GH₵ {order?.shipping_total?.toFixed(2)}</p>
-              <p className="font-bold text-lg border-t border-gray-400 pt-1 mt-1">Total: GH₵ {order?.total?.toFixed(2)}</p>
+              <p>Subtotal: GH₵ {money(order?.subtotal)}</p>
+              <p>Shipping: GH₵ {money(order?.shipping_total)}</p>
+              <p className="font-bold text-lg border-t border-gray-400 pt-1 mt-1">Total: GH₵ {money(order?.total)}</p>
             </div>
           </div>
 
@@ -415,7 +416,7 @@ export default function OrderDetailClient({ orderId }: OrderDetailClientProps) {
                       <p className="text-xs text-gray-500">SKU: {item.sku}</p>
                     </div>
                     <div className="text-right">
-                      <p className="font-semibold text-gray-900 mb-1">GH₵ {item.unit_price?.toFixed(2)}</p>
+                      <p className="font-semibold text-gray-900 mb-1">GH₵ {money(item.unit_price)}</p>
                       <p className="text-sm text-gray-600">Qty: {item.quantity}</p>
                     </div>
                   </div>
@@ -425,25 +426,25 @@ export default function OrderDetailClient({ orderId }: OrderDetailClientProps) {
               <div className="mt-6 pt-6 border-t border-gray-200 space-y-3">
                 <div className="flex justify-between text-gray-700">
                   <span>Subtotal</span>
-                  <span>GH₵ {order.subtotal?.toFixed(2)}</span>
+                  <span>GH₵ {money(order.subtotal)}</span>
                 </div>
                 <div className="flex justify-between text-gray-700">
                   <span>Shipping</span>
-                  <span>GH₵ {order.shipping_total?.toFixed(2)}</span>
+                  <span>GH₵ {money(order.shipping_total)}</span>
                 </div>
                 <div className="flex justify-between text-gray-700">
                   <span>Tax</span>
-                  <span>GH₵ {order.tax_total?.toFixed(2)}</span>
+                  <span>GH₵ {money(order.tax_total)}</span>
                 </div>
                 {order.discount_total > 0 && (
                   <div className="flex justify-between text-gray-900 font-semibold">
                     <span>Discount</span>
-                    <span>-GH₵ {order.discount_total?.toFixed(2)}</span>
+                    <span>-GH₵ {money(order.discount_total)}</span>
                   </div>
                 )}
                 <div className="flex justify-between text-xl font-bold text-gray-900 pt-3 border-t border-gray-200">
                   <span>Total</span>
-                  <span>GH₵ {order.total?.toFixed(2)}</span>
+                  <span>GH₵ {money(order.total)}</span>
                 </div>
               </div>
             </div>

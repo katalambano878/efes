@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { money } from '@/lib/format-money';
 
 interface Product {
   id: string;
@@ -67,9 +68,9 @@ export default function CartSuggestions() {
               <div className="p-3">
                 <h4 className="font-semibold text-gray-900 text-sm mb-2 line-clamp-2">{product.name}</h4>
                 <div className="flex items-center space-x-2 mb-2">
-                  <span className="text-lg font-bold text-gray-900">GH₵{product.price.toFixed(2)}</span>
+                  <span className="text-lg font-bold text-gray-900">GH₵{money(product.price)}</span>
                   {product.originalPrice && (
-                    <span className="text-xs text-gray-400 line-through">GH₵{product.originalPrice.toFixed(2)}</span>
+                    <span className="text-xs text-gray-400 line-through">GH₵{money(product.originalPrice)}</span>
                   )}
                 </div>
                 <button className="w-full py-2 bg-gray-900 text-white text-sm rounded-lg font-semibold hover:bg-gray-800 transition-colors whitespace-nowrap">

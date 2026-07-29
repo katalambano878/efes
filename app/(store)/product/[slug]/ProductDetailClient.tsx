@@ -8,6 +8,7 @@ import { cachedQuery } from '@/lib/query-cache';
 import ProductCard from '@/components/ProductCard';
 import ProductReviews from '@/components/ProductReviews';
 import { StructuredData, generateProductSchema, generateBreadcrumbSchema } from '@/components/SEOHead';
+import { money } from '@/lib/format-money';
 import { notFound } from 'next/navigation';
 import { useCart } from '@/context/CartContext';
 import { usePageTitle } from '@/hooks/usePageTitle';
@@ -125,7 +126,7 @@ export default function ProductDetailClient({ slug }: { slug: string }) {
 
         // Ensure at least one image/placeholder
         if (transformedProduct.images.length === 0) {
-          transformedProduct.images = ['https://via.placeholder.com/800x800?text=No+Image'];
+          transformedProduct.images = ['/logo-efes.png'];
         }
 
         setProduct(transformedProduct);
@@ -166,7 +167,7 @@ export default function ProductDetailClient({ slug }: { slug: string }) {
                 slug: p.slug,
                 name: p.name,
                 price: p.price,
-                image: p.product_images?.[0]?.url || 'https://via.placeholder.com/800?text=No+Image',
+                image: p.product_images?.[0]?.url || '/logo-efes.png',
                 rating: p.rating_avg || 0,
                 reviewCount: 0,
                 inStock: effectiveStock > 0,
@@ -376,13 +377,13 @@ export default function ProductDetailClient({ slug }: { slug: string }) {
                 <div className="flex items-baseline space-x-4 mb-8">
                   {hasVariants && !selectedVariant ? (
                     <span className="text-2xl font-light text-gray-900 tracking-tight">
-                      From GH₵{minVariantPrice.toFixed(2)}
+                      From GH₵{money(minVariantPrice)}
                     </span>
                   ) : (
-                    <span className="text-2xl font-light text-gray-900 tracking-tight">GH₵{activePrice.toFixed(2)}</span>
+                    <span className="text-2xl font-light text-gray-900 tracking-tight">GH₵{money(activePrice)}</span>
                   )}
                   {product.compare_at_price && product.compare_at_price > activePrice && (
-                    <span className="text-lg text-gray-400 line-through font-light tracking-tight">GH₵{product.compare_at_price.toFixed(2)}</span>
+                    <span className="text-lg text-gray-400 line-through font-light tracking-tight">GH₵{money(product.compare_at_price)}</span>
                   )}
                 </div>
 
@@ -470,7 +471,7 @@ export default function ProductDetailClient({ slug }: { slug: string }) {
                       <div className="mb-8">
                         <label className="block font-semibold text-gray-900 mb-3">
                           Variant: {selectedVariant ? (
-                            <span className="text-gray-900 font-normal">{selectedVariant.name} — GH₵{selectedVariant.price?.toFixed(2)}</span>
+                            <span className="text-gray-900 font-normal">{selectedVariant.name} — GH₵{money(selectedVariant.price)}</span>
                           ) : (
                             <span className="text-red-500 font-normal text-sm">Please select a variant</span>
                           )}
@@ -503,7 +504,7 @@ export default function ProductDetailClient({ slug }: { slug: string }) {
                                   <span className="px-4 pt-3 text-center font-medium">{variant.name}</span>
                                 )}
                                 <span className={`px-2 pb-2 text-xs ${isSelected ? 'text-gray-700' : 'text-gray-500'}`}>
-                                  GH₵{(variant.price || product.price).toFixed(2)}
+                                  GH₵{money(variant.price || product.price)}
                                 </span>
                               </button>
                             );
@@ -518,7 +519,7 @@ export default function ProductDetailClient({ slug }: { slug: string }) {
                       <div className="mb-8">
                         <label className="block font-semibold text-gray-900 mb-3">
                           Size / Type: {selectedVariant ? (
-                            <span className="text-gray-900 font-normal">{selectedVariant.name} — GH₵{selectedVariant.price?.toFixed(2)}</span>
+                            <span className="text-gray-900 font-normal">{selectedVariant.name} — GH₵{money(selectedVariant.price)}</span>
                           ) : (
                             <span className="text-red-500 font-normal text-sm">Please select</span>
                           )}
@@ -551,7 +552,7 @@ export default function ProductDetailClient({ slug }: { slug: string }) {
                                   <span className="px-4 pt-3 text-center font-medium">{variant.name}</span>
                                 )}
                                 <span className={`px-2 pb-2 text-xs ${isSelected ? 'text-gray-700' : 'text-gray-500'}`}>
-                                  GH₵{(variant.price || product.price).toFixed(2)}
+                                  GH₵{money(variant.price || product.price)}
                                 </span>
                               </button>
                             );

@@ -5,6 +5,7 @@ import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import { usePageTitle } from '@/hooks/usePageTitle';
+import { money } from '@/lib/format-money';
 
 export default function PaymentPage() {
   usePageTitle('Complete Payment');
@@ -55,7 +56,9 @@ export default function PaymentPage() {
 
         // If already paid, redirect to success page
         if (data.payment_status === 'paid') {
-          router.push(`/order-success?order=${data.order_number}`);
+          router.push(
+            `/order-success?order=${encodeURIComponent(data.order_number)}&email=${encodeURIComponent(data.email || '')}`
+          );
           return;
         }
 
@@ -178,23 +181,23 @@ export default function PaymentPage() {
           <div className="space-y-3 mb-6">
             <div className="flex justify-between text-sm">
               <span className="text-gray-600">Subtotal</span>
-              <span className="text-gray-900">GH₵ {order?.subtotal?.toFixed(2)}</span>
+              <span className="text-gray-900">GH₵ {money(order?.subtotal)}</span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-gray-600">Shipping</span>
-              <span className="text-gray-900">GH₵ {order?.shipping_total?.toFixed(2)}</span>
+              <span className="text-gray-900">GH₵ {money(order?.shipping_total)}</span>
             </div>
             {order?.discount_total > 0 && (
               <div className="flex justify-between text-sm">
                 <span className="text-gray-600">Discount</span>
-                <span className="text-gray-700">-GH₵ {order?.discount_total?.toFixed(2)}</span>
+                <span className="text-gray-700">-GH₵ {money(order?.discount_total)}</span>
               </div>
             )}
           </div>
 
           <div className="flex justify-between items-center pt-4 border-t border-gray-200">
             <span className="text-lg font-semibold text-gray-900">Total</span>
-            <span className="text-2xl font-bold text-gray-900">GH₵ {order?.total?.toFixed(2)}</span>
+            <span className="text-2xl font-bold text-gray-900">GH₵ {money(order?.total)}</span>
           </div>
         </div>
 
@@ -294,8 +297,8 @@ export default function PaymentPage() {
             <>
               <i className="ri-secure-payment-line mr-2"></i>
               {order?.payment_status === 'failed'
-                ? `Retry with ${paymentMethod === 'hubtel' ? 'Hubtel' : 'Moolre'} (GH₵ ${order?.total?.toFixed(2)})`
-                : `Pay GH₵ ${order?.total?.toFixed(2)} with ${paymentMethod === 'hubtel' ? 'Hubtel' : 'Moolre'}`}
+                ? `Retry with ${paymentMethod === 'hubtel' ? 'Hubtel' : 'Moolre'} (GH₵ ${money(order?.total)})`
+                : `Pay GH₵ ${money(order?.total)} with ${paymentMethod === 'hubtel' ? 'Hubtel' : 'Moolre'}`}
             </>
           )}
         </button>

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { supabaseAdmin } from '@/lib/supabase-admin';
 import {
   searchProducts,
   getProductForCart,
@@ -32,7 +33,6 @@ import {
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const groqKey = process.env.GROQ_API_KEY;
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -519,9 +519,7 @@ export async function POST(request: Request) {
 
     const { userId, email: userEmail } = await detectAuth(request);
 
-    const supabase = supabaseServiceKey
-      ? createClient(supabaseUrl, supabaseServiceKey)
-      : createClient(supabaseUrl, supabaseKey);
+    const supabase = supabaseAdmin;
 
     let profile: ChatCustomerProfile | null = null;
     if (userId) {

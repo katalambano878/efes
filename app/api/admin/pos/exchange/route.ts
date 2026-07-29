@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { hasDbBackend } from '@/lib/api-gate';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 
 function getAccessToken(request: Request): string | null {
@@ -26,7 +27,7 @@ function getAccessToken(request: Request): string | null {
 }
 
 async function getStaff(request: Request) {
-    if (!process.env.SUPABASE_SERVICE_ROLE_KEY) return { error: 'Server misconfiguration', status: 503 as const };
+    if (!hasDbBackend()) return { error: 'Server misconfiguration', status: 503 as const };
     const token = getAccessToken(request);
     if (!token) return { error: 'Not authenticated', status: 401 as const };
     const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);

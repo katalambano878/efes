@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { hasDbBackend } from '@/lib/api-gate';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 
 function getAccessToken(request: Request): string | null {
@@ -30,7 +31,7 @@ function getAccessToken(request: Request): string | null {
 }
 
 async function getAuthenticatedAdmin(request: Request) {
-  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) return null;
+  if (!hasDbBackend()) return null;
 
   const token = getAccessToken(request);
   if (!token) return null;
@@ -125,6 +126,7 @@ export async function POST(request: Request) {
   }
 
   // Create new user via Supabase Auth Admin API
+  // TODO: auth.admin.createUser is not yet in plain-PG compat
   const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
     email: email.toLowerCase().trim(),
     password,

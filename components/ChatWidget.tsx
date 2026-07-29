@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { usePathname } from 'next/navigation';
 import { useCart } from '@/context/CartContext';
+import { money } from '@/lib/format-money';
 import type { CartItem } from '@/context/CartContext';
 import MarkdownMessage from '@/components/MarkdownMessage';
 
@@ -945,7 +946,7 @@ function ProductCard({ product, onAddToCart }: { product: ChatProduct; onAddToCa
         </div>
         <div className="flex-1 min-w-0">
           <p className="text-xs sm:text-sm font-medium text-gray-900 truncate">{product.name}</p>
-          <p className="text-sm font-bold text-gray-600">GH₵{product.price.toFixed(2)}</p>
+          <p className="text-sm font-bold text-gray-600">GH₵{money(product.price)}</p>
           <span className={`text-[10px] font-medium ${product.inStock ? 'text-gray-600' : 'text-red-500'}`}>
             {product.inStock ? 'In Stock' : 'Out of Stock'}
           </span>
@@ -1013,14 +1014,14 @@ function OrderCard({ order }: { order: ChatOrder }) {
         {order.items.slice(0, 3).map((item, i) => (
           <div key={i} className="flex justify-between text-xs">
             <span className="text-gray-600 truncate flex-1">{item.name} x{item.quantity}</span>
-            <span className="text-gray-900 font-medium ml-2">GH₵{item.price.toFixed(2)}</span>
+            <span className="text-gray-900 font-medium ml-2">GH₵{money(item.price)}</span>
           </div>
         ))}
         {order.items.length > 3 && <p className="text-[10px] text-gray-400">+{order.items.length - 3} more items</p>}
       </div>
       <div className="px-4 py-2 border-t border-gray-50 flex justify-between items-center">
         <span className="text-xs text-gray-500">{new Date(order.created_at).toLocaleDateString('en-GB')}</span>
-        <span className="text-sm font-bold text-gray-900">GH₵{order.total.toFixed(2)}</span>
+        <span className="text-sm font-bold text-gray-900">GH₵{money(order.total)}</span>
       </div>
       {order.tracking_number && (
         <div className="px-4 pb-2">
@@ -1094,7 +1095,7 @@ function CouponCard({ coupon }: { coupon: ChatCoupon }) {
           <span className="font-mono text-sm font-bold text-gray-900 bg-gray-100 px-2 py-0.5 rounded">{coupon.code}</span>
           {coupon.valid && coupon.value && (
             <span className="text-sm font-bold text-gray-600">
-              {coupon.type === 'percentage' ? `${coupon.value}% OFF` : coupon.type === 'free_shipping' ? 'Free Shipping' : `GH₵${coupon.value.toFixed(2)} OFF`}
+              {coupon.type === 'percentage' ? `${coupon.value}% OFF` : coupon.type === 'free_shipping' ? 'Free Shipping' : `GH₵${money(coupon.value)} OFF`}
             </span>
           )}
         </div>
@@ -1102,7 +1103,7 @@ function CouponCard({ coupon }: { coupon: ChatCoupon }) {
           <p className="text-xs text-red-500 mt-1">{coupon.reason}</p>
         )}
         {coupon.valid && coupon.minimum_purchase && (
-          <p className="text-[10px] text-gray-400 mt-1">Min. purchase: GH₵{coupon.minimum_purchase.toFixed(2)}</p>
+          <p className="text-[10px] text-gray-400 mt-1">Min. purchase: GH₵{money(coupon.minimum_purchase)}</p>
         )}
         {coupon.valid && coupon.expires && (
           <p className="text-[10px] text-gray-400">Expires: {new Date(coupon.expires).toLocaleDateString('en-GB')}</p>

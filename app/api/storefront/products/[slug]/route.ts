@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { requireDbBackend } from '@/lib/api-gate';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 
 /**
@@ -14,9 +15,8 @@ export async function GET(
     return NextResponse.json({ error: 'Slug required' }, { status: 400 });
   }
 
-  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
-    return NextResponse.json({ error: 'Server misconfiguration' }, { status: 503 });
-  }
+  const gate = requireDbBackend();
+  if (gate) return gate;
 
   try {
     const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(slug);

@@ -67,7 +67,7 @@ export default function OrderHistory() {
               id: item.id,
               productId: item.product_id || null,
               name: item.product_name,
-              image: item.metadata?.image || 'https://via.placeholder.com/150',
+              image: item.metadata?.image || '/logo-efes.png',
               quantity: item.quantity,
               price: asNumber(item.unit_price),
               variant: item.variant_name || null,
@@ -123,7 +123,7 @@ export default function OrderHistory() {
             product.product_images?.[0]?.url ||
             product.images?.[0]?.url ||
             item.image ||
-            'https://via.placeholder.com/150';
+            '/logo-efes.png';
           const price = asNumber(product.sale_price ?? product.price ?? item.price);
 
           addToCart({

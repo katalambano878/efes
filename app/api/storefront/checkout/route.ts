@@ -1,8 +1,23 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { asNumber } from '@/lib/format-money';
+import { checkRateLimit, getClientIdentifier } from '@/lib/rate-limit';
 
+const isValidUUID = (str: string) =>
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
+
+/**
+ * POST /api/storefront/checkout
+ * Creates an order using server-side product/variant prices (never trust client totals).
+ */
 export async function POST(request: Request) {
   try {
+    const clientId = getClientIdentifier(request);
+    const rate = checkRateLimit(`checkout:${clientId}`, { maxRequests: 20, windowSeconds: 60 });
+    if (!rate.success) {
+      return NextResponse.json({ error: 'Too many requests. Please wait a moment.' }, { status: 429 });
+    }
+
     const body = await request.json();
     const {
       orderNumber,
@@ -10,50 +25,186 @@ export async function POST(request: Request) {
       userId,
       email,
       phone,
-      subtotal,
       tax,
       shippingCost,
       discountTotal,
       couponCode,
-      total,
       deliveryMethod,
       paymentMethod,
       shippingData,
       cart,
     } = body;
 
-    if (!orderNumber || !email || !cart?.length) {
+    if (!orderNumber || !email || !cart?.length || !shippingData) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
-    // 1. Create Order
+    // Resolve products + variants and reprice from DB
+    const lineItems: Array<{
+      product_id: string;
+      product_name: string;
+      variant_name: string | null;
+      variant_id: string | null;
+      quantity: number;
+      unit_price: number;
+      total_price: number;
+      metadata: Record<string, unknown>;
+    }> = [];
+
+    let subtotal = 0;
+
+    for (const item of cart) {
+      const qty = Math.max(1, Math.floor(asNumber(item.quantity, 1)));
+      let productId = item.id;
+      let productRow: any = null;
+
+      if (!isValidUUID(String(productId || ''))) {
+        const { data: product } = await supabaseAdmin
+          .from('products')
+          .select('id, name, price, quantity, status, track_quantity, continue_selling, metadata, slug')
+          .or(`slug.eq.${productId},id.eq.${productId}`)
+          .maybeSingle();
+        if (!product || product.status !== 'active') {
+          return NextResponse.json(
+            { error: `Product not found: ${item.name || productId}. Remove it from your cart and try again.` },
+            { status: 400 }
+          );
+        }
+        productId = product.id;
+        productRow = product;
+      } else {
+        const { data: product } = await supabaseAdmin
+          .from('products')
+          .select('id, name, price, quantity, status, track_quantity, continue_selling, metadata, slug')
+          .eq('id', productId)
+          .maybeSingle();
+        if (!product || product.status !== 'active') {
+          return NextResponse.json(
+            { error: `Product not available: ${item.name || productId}` },
+            { status: 400 }
+          );
+        }
+        productRow = product;
+      }
+
+      let unitPrice = asNumber(productRow.price);
+      let variantName: string | null = item.variant || null;
+      let variantId: string | null = item.variantId || item.variant_id || null;
+      let availableQty = asNumber(productRow.quantity, 0);
+
+      if (variantId && isValidUUID(String(variantId))) {
+        const { data: variant } = await supabaseAdmin
+          .from('product_variants')
+          .select('id, name, price, quantity, option1, option2')
+          .eq('id', variantId)
+          .eq('product_id', productId)
+          .maybeSingle();
+        if (!variant) {
+          return NextResponse.json({ error: `Variant not found for ${productRow.name}` }, { status: 400 });
+        }
+        unitPrice = asNumber(variant.price, unitPrice);
+        variantName = variant.name || [variant.option1, variant.option2].filter(Boolean).join(' / ') || variantName;
+        availableQty = asNumber(variant.quantity, 0);
+      } else if (variantName) {
+        // Best-effort match by name/options
+        const { data: variants } = await supabaseAdmin
+          .from('product_variants')
+          .select('id, name, price, quantity, option1, option2')
+          .eq('product_id', productId);
+        const match = (variants || []).find(
+          (v: any) =>
+            v.name === variantName ||
+            v.option2 === variantName ||
+            `${v.option1} / ${v.option2}` === variantName
+        );
+        if (match) {
+          variantId = match.id;
+          unitPrice = asNumber(match.price, unitPrice);
+          availableQty = asNumber(match.quantity, 0);
+        }
+      }
+
+      if (productRow.track_quantity !== false && !productRow.continue_selling && availableQty < qty) {
+        return NextResponse.json(
+          { error: `Insufficient stock for ${productRow.name}${variantName ? ` (${variantName})` : ''}` },
+          { status: 400 }
+        );
+      }
+
+      const lineTotal = unitPrice * qty;
+      subtotal += lineTotal;
+      lineItems.push({
+        product_id: productId,
+        product_name: productRow.name || item.name,
+        variant_name: variantName,
+        variant_id: variantId,
+        quantity: qty,
+        unit_price: unitPrice,
+        total_price: lineTotal,
+        metadata: {
+          image: item.image || null,
+          slug: productRow.slug || item.slug || null,
+          preorder_shipping: productRow.metadata?.preorder_shipping || null,
+        },
+      });
+    }
+
+    const shippingTotal = Math.max(0, asNumber(shippingCost, 0));
+    let discount = Math.max(0, asNumber(discountTotal, 0));
+    let appliedCoupon: string | null = null;
+
+    if (couponCode) {
+      const code = String(couponCode).trim();
+      const { data: coupon } = await supabaseAdmin
+        .from('coupons')
+        .select('*')
+        .ilike('code', code)
+        .maybeSingle();
+      if (coupon && (coupon.status === 'active' || coupon.is_active === true)) {
+        appliedCoupon = coupon.code;
+        if (coupon.type === 'percentage' || coupon.discount_type === 'percentage') {
+          discount = Math.min(subtotal, (subtotal * asNumber(coupon.value || coupon.amount)) / 100);
+        } else {
+          discount = Math.min(subtotal, asNumber(coupon.value || coupon.amount));
+        }
+      } else {
+        discount = 0;
+      }
+    }
+
+    const taxTotal = Math.max(0, asNumber(tax, 0));
+    const total = Math.max(0, subtotal + shippingTotal + taxTotal - discount);
+
     const { data: order, error: orderError } = await supabaseAdmin
       .from('orders')
-      .insert([{
-        order_number: orderNumber,
-        user_id: userId || null,
-        email,
-        phone,
-        status: 'pending',
-        payment_status: 'pending',
-        currency: 'GHS',
-        subtotal,
-        tax_total: tax,
-        shipping_total: shippingCost,
-        discount_total: discountTotal || 0,
-        total,
-        shipping_method: deliveryMethod,
-        payment_method: paymentMethod,
-        shipping_address: shippingData,
-        billing_address: shippingData,
-        metadata: {
-          guest_checkout: !userId,
-          first_name: shippingData.firstName,
-          last_name: shippingData.lastName,
-          tracking_number: trackingNumber,
-          coupon_code: couponCode || null,
+      .insert([
+        {
+          order_number: orderNumber,
+          user_id: userId || null,
+          email,
+          phone,
+          status: 'pending',
+          payment_status: 'pending',
+          currency: 'GHS',
+          subtotal,
+          tax_total: taxTotal,
+          shipping_total: shippingTotal,
+          discount_total: discount,
+          total,
+          shipping_method: deliveryMethod,
+          payment_method: paymentMethod,
+          shipping_address: shippingData,
+          billing_address: shippingData,
+          metadata: {
+            guest_checkout: !userId,
+            first_name: shippingData.firstName,
+            last_name: shippingData.lastName,
+            tracking_number: trackingNumber,
+            coupon_code: appliedCoupon,
+            server_priced: true,
+          },
         },
-      }])
+      ])
       .select()
       .single();
 
@@ -62,67 +213,20 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: orderError.message }, { status: 500 });
     }
 
-    // 2. Resolve slugs to UUIDs and build order items
-    const isValidUUID = (str: string) =>
-      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
-
-    const productIds = cart.map((i: any) => i.id).filter(isValidUUID);
-    const { data: productsData } = productIds.length > 0
-      ? await supabaseAdmin.from('products').select('id, metadata').in('id', productIds)
-      : { data: [] };
-    const productMetaMap = new Map((productsData || []).map((p: any) => [p.id, p.metadata]));
-
-    const orderItems = [];
-    for (const item of cart) {
-      let productId = item.id;
-
-      if (!isValidUUID(productId)) {
-        const { data: product } = await supabaseAdmin
-          .from('products')
-          .select('id, metadata')
-          .or(`slug.eq.${productId},id.eq.${productId}`)
-          .single();
-
-        if (product) {
-          productId = product.id;
-          productMetaMap.set(product.id, product.metadata);
-        } else {
-          return NextResponse.json(
-            { error: `Product not found: ${item.name}. Please remove it from your cart and try again.` },
-            { status: 400 }
-          );
-        }
-      }
-
-      const prodMeta = productMetaMap.get(productId);
-      orderItems.push({
-        order_id: order.id,
-        product_id: productId,
-        product_name: item.name,
-        variant_name: item.variant || null,
-        quantity: item.quantity,
-        unit_price: item.price,
-        total_price: item.price * item.quantity,
-        metadata: {
-          image: item.image,
-          slug: item.slug,
-          preorder_shipping: prodMeta?.preorder_shipping || null,
-        },
-      });
-    }
-
-    const { error: itemsError } = await supabaseAdmin.from('order_items').insert(orderItems);
+    const { error: itemsError } = await supabaseAdmin.from('order_items').insert(
+      lineItems.map((li) => ({ ...li, order_id: order.id }))
+    );
     if (itemsError) {
       console.error('Order items insert error:', itemsError);
+      await supabaseAdmin.from('orders').delete().eq('id', order.id);
       return NextResponse.json({ error: itemsError.message }, { status: 500 });
     }
 
-    // 3. Upsert customer record
-    const fullName = `${shippingData.firstName} ${shippingData.lastName}`.trim();
+    const fullName = `${shippingData.firstName || ''} ${shippingData.lastName || ''}`.trim();
     try {
       await supabaseAdmin.rpc('upsert_customer_from_order', {
-        p_email: shippingData.email,
-        p_phone: shippingData.phone,
+        p_email: shippingData.email || email,
+        p_phone: shippingData.phone || phone,
         p_full_name: fullName,
         p_first_name: shippingData.firstName,
         p_last_name: shippingData.lastName,
@@ -133,18 +237,13 @@ export async function POST(request: Request) {
       console.warn('upsert_customer_from_order warning:', e.message);
     }
 
-    // Store credit redemption at checkout — NOT in original scope (deferred).
-    // if (storeCreditUsed > 0 && customerId) {
-    //   deduct from customers.store_credit, add store_credit_transactions row, adjust total
-    // }
-
-    // 4. Increment coupon usage (best-effort)
-    if (couponCode) {
+    // Coupon usage should increment on paid — still best-effort at checkout for now
+    if (appliedCoupon) {
       try {
         const { data: coupon } = await supabaseAdmin
           .from('coupons')
           .select('id, usage_count')
-          .ilike('code', String(couponCode).trim())
+          .ilike('code', appliedCoupon)
           .single();
         if (coupon) {
           await supabaseAdmin
@@ -158,8 +257,8 @@ export async function POST(request: Request) {
     }
 
     return NextResponse.json({ order });
-  } catch (e: any) {
-    console.error('Checkout API error:', e);
-    return NextResponse.json({ error: e.message || 'Internal server error' }, { status: 500 });
+  } catch (error: any) {
+    console.error('Checkout API error:', error);
+    return NextResponse.json({ error: error.message || 'Checkout failed' }, { status: 500 });
   }
 }

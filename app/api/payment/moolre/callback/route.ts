@@ -71,12 +71,14 @@ export async function POST(req: Request) {
         console.log('[Callback] Data keys:', body.data ? Object.keys(body.data).join(', ') : 'no data object');
 
         // ============================================================
-        // SECURITY: Verify callback secret (only reject on mismatch)
+        // SECURITY: Require callback secret when configured
         // ============================================================
         const expectedSecret = process.env.MOOLRE_CALLBACK_SECRET;
-        if (expectedSecret && body.secret && body.secret !== expectedSecret) {
-            console.error('[Callback] Secret mismatch! Possible spoofed callback.');
-            return NextResponse.json({ success: false, message: 'Invalid secret' }, { status: 403 });
+        if (expectedSecret) {
+            if (!body.secret || body.secret !== expectedSecret) {
+                console.error('[Callback] Missing or invalid secret — rejecting.');
+                return NextResponse.json({ success: false, message: 'Invalid secret' }, { status: 403 });
+            }
         }
 
         // ============================================================
@@ -165,18 +167,20 @@ export async function POST(req: Request) {
             }
 
             // ============================================================
-            // SECURITY: Verify amount matches — REJECT if mismatch
+            // SECURITY: Amount required + must match order total
             // ============================================================
             const callbackAmount = data.amount ? parseFloat(data.amount) : (body.amount ? parseFloat(body.amount) : null);
-            if (callbackAmount !== null) {
-                const expectedAmount = Number(existingOrder.total);
-                if (Math.abs(callbackAmount - expectedAmount) > 0.01) {
-                    console.error('[Callback] AMOUNT MISMATCH — REJECTING! Expected:', expectedAmount, 'Got:', callbackAmount, 'Order:', merchantOrderRef);
-                    return NextResponse.json({
-                        success: false,
-                        message: 'Payment amount does not match order total'
-                    }, { status: 400 });
-                }
+            if (callbackAmount === null || !Number.isFinite(callbackAmount)) {
+                console.error('[Callback] Missing amount — REJECTING. Order:', merchantOrderRef);
+                return NextResponse.json({ success: false, message: 'Missing payment amount' }, { status: 400 });
+            }
+            const expectedAmount = Number(existingOrder.total);
+            if (Math.abs(callbackAmount - expectedAmount) > 0.01) {
+                console.error('[Callback] AMOUNT MISMATCH — REJECTING! Expected:', expectedAmount, 'Got:', callbackAmount, 'Order:', merchantOrderRef);
+                return NextResponse.json({
+                    success: false,
+                    message: 'Payment amount does not match order total'
+                }, { status: 400 });
             }
 
             // Mark order as paid via RPC

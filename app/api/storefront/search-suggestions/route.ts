@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { requireDbBackend } from '@/lib/api-gate';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 
 const PRODUCT_SUGGEST_FIELDS = 'name, slug, price, product_images(url, position)';
@@ -8,9 +9,8 @@ const PRODUCT_SUGGEST_FIELDS = 'name, slug, price, product_images(url, position)
  * Lightweight product hints for header search (name + slug match).
  */
 export async function GET(request: Request) {
-  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
-    return NextResponse.json({ error: 'Server misconfiguration' }, { status: 503 });
-  }
+  const gate = requireDbBackend();
+  if (gate) return gate;
 
   const { searchParams } = new URL(request.url);
   const raw = (searchParams.get('q') || '').trim();

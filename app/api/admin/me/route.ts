@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { requireDbBackend } from '@/lib/api-gate';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 
 function getAccessToken(request: Request): string | null {
@@ -34,12 +35,8 @@ function getAccessToken(request: Request): string | null {
  * Returns current admin/staff user and profile using service role (bypasses RLS).
  */
 export async function GET(request: Request) {
-  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
-    return NextResponse.json(
-      { error: 'Server misconfiguration: SUPABASE_SERVICE_ROLE_KEY not set' },
-      { status: 503 }
-    );
-  }
+  const gate = requireDbBackend();
+  if (gate) return gate;
 
   const token = getAccessToken(request);
   if (!token) {

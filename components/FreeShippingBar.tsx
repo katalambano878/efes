@@ -1,5 +1,7 @@
 'use client';
 
+import { money } from '@/lib/format-money';
+
 interface FreeShippingBarProps {
   currentAmount: number;
   threshold?: number;
@@ -27,7 +29,7 @@ export default function FreeShippingBar({ currentAmount, threshold = 200 }: Free
             {isQualified ? (
               <>🎉 You've qualified for FREE shipping!</>
             ) : (
-              <>Add GH₵{remaining.toFixed(2)} more for FREE shipping</>
+              <>Add GH₵{money(remaining)} more for FREE shipping</>
             )}
           </span>
         </div>

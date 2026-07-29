@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
+import { money } from '@/lib/format-money';
 
 export default function CustomerDetailsPage() {
   const params = useParams();
@@ -126,7 +127,7 @@ export default function CustomerDetailsPage() {
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
           <p className="text-sm font-medium text-gray-500 mb-1">Total Spent</p>
-          <p className="text-2xl font-bold text-gray-900">GH₵{totalSpent.toFixed(2)}</p>
+          <p className="text-2xl font-bold text-gray-900">GH₵{money(totalSpent)}</p>
         </div>
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
           <p className="text-sm font-medium text-gray-500 mb-1">Total Orders</p>
@@ -183,7 +184,7 @@ export default function CustomerDetailsPage() {
                     </span>
                   </td>
                   <td className="px-6 py-4 text-sm font-bold text-gray-900">
-                    GH₵{(order.total || 0).toFixed(2)}
+                    GH₵{money(order.total || 0)}
                   </td>
                   <td className="px-6 py-4 text-right">
                     <Link href={`/admin/orders/${order.id}`} className="text-gray-400 hover:text-gray-700">

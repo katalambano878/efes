@@ -689,7 +689,7 @@ CREATE POLICY "Allow authenticated write" ON site_settings
                             className="w-full h-full object-cover"
                             onError={(e) => {
                               (e.target as HTMLImageElement).src =
-                                'https://via.placeholder.com/800x450?text=Image';
+                                '/logo-efes.png';
                             }}
                           />
                         )}

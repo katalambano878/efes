@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 
-const PLACEHOLDER_IMAGE = 'https://via.placeholder.com/300?text=No+Image';
+const PLACEHOLDER_IMAGE = '/logo-efes.png';
 
 export default function PrintInventoryPage() {
     const [products, setProducts] = useState<any[]>([]);

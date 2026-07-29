@@ -105,10 +105,12 @@ export async function POST(req: Request) {
             return NextResponse.json({ success: false, message: 'Could not validate stock' }, { status: 500 });
         }
 
-        const variantIds = orderItems.filter(i => i.variant_id).map(i => i.variant_id as string);
+        const variantIds = orderItems
+            .filter((i: { variant_id?: string | null }) => i.variant_id)
+            .map((i: { variant_id?: string | null }) => i.variant_id as string);
         const productIds = orderItems
-            .filter(i => i.product_id)
-            .map(i => i.product_id as string);
+            .filter((i: { product_id?: string | null }) => i.product_id)
+            .map((i: { product_id?: string | null }) => i.product_id as string);
 
         const variantStockMap: Record<string, { quantity: number; price: number | null }> = {};
         if (variantIds.length > 0) {
@@ -273,8 +275,11 @@ export async function POST(req: Request) {
                 );
             }
 
-            const remaining = orderItems.filter(i => !removeIds.includes(i.id));
-            const newSubtotal = remaining.reduce((sum, i) => sum + Number(i.total_price ?? 0), 0);
+            const remaining = orderItems.filter((i: { id: string }) => !removeIds.includes(i.id));
+            const newSubtotal = remaining.reduce(
+              (sum: number, i: { total_price?: number | null }) => sum + Number(i.total_price ?? 0),
+              0
+            );
             const newTotal = newSubtotal;
 
             const updatedMetadata = {
@@ -322,7 +327,7 @@ export async function POST(req: Request) {
 
         const baseUrl = getPublicSiteUrl();
 
-        const defaultRedirectUrl = `${baseUrl}/order-success?order=${orderRef}&payment_success=true`;
+        const defaultRedirectUrl = `${baseUrl}/order-success?order=${encodeURIComponent(orderRef)}&email=${encodeURIComponent(customerEmail || order.email || '')}&payment_success=true`;
         const allowedPrefixes = ['https://'];
         const safeRedirectUrl =
             typeof redirectUrl === 'string' &&

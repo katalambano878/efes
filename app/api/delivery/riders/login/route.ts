@@ -1,11 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-
-const supabaseAdmin = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { autoRefreshToken: false, persistSession: false } }
-);
+import { supabaseAdmin } from '@/lib/supabase-admin';
 
 function getToken(req: NextRequest): string | null {
     const auth = req.headers.get('authorization');
@@ -63,8 +57,10 @@ export async function POST(req: NextRequest) {
             updated_at: new Date().toISOString(),
         }).eq('id', authUserId);
         // Reset their password so the admin can hand it over
+        // TODO: auth.admin (createUser/updateUserById) is not yet in plain-PG compat
         await supabaseAdmin.auth.admin.updateUserById(authUserId, { password });
     } else {
+        // TODO: auth.admin (createUser/updateUserById) is not yet in plain-PG compat
         const { data: created, error: createErr } = await supabaseAdmin.auth.admin.createUser({
             email: cleanEmail,
             password,

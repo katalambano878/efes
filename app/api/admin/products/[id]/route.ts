@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { requireDbBackend } from '@/lib/api-gate';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 
 function getAccessToken(request: Request): string | null {
@@ -26,9 +27,8 @@ function getAccessToken(request: Request): string | null {
 }
 
 async function requireAdmin(request: Request): Promise<NextResponse | null> {
-  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
-    return NextResponse.json({ error: 'Server misconfiguration' }, { status: 503 });
-  }
+  const gate = requireDbBackend();
+  if (gate) return gate;
   const token = getAccessToken(request);
   if (!token) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
   const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(token);
@@ -154,7 +154,7 @@ export async function DELETE(
 
     const { data: reviews } = await supabaseAdmin.from('reviews').select('id').eq('product_id', productId);
     if (reviews?.length) {
-      const reviewIds = reviews.map((r) => r.id);
+      const reviewIds = reviews.map((r: { id: string }) => r.id);
       await supabaseAdmin.from('review_images').delete().in('review_id', reviewIds);
       await supabaseAdmin.from('reviews').delete().eq('product_id', productId);
     }

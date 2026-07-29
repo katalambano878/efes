@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
+import { money } from '@/lib/format-money';
 
 type CouponType = 'percentage' | 'fixed_amount' | 'free_shipping';
 
@@ -184,7 +185,7 @@ export default function AdminCouponsPage() {
 
   const formatValue = (c: Coupon) => {
     if (c.type === 'percentage') return `${c.value}%`;
-    if (c.type === 'fixed_amount') return `GH₵ ${Number(c.value).toFixed(2)}`;
+    if (c.type === 'fixed_amount') return `GH₵ ${money(c.value)}`;
     return 'Free Shipping';
   };
 
@@ -254,7 +255,7 @@ export default function AdminCouponsPage() {
                       <td className="py-4 px-4 text-gray-700">{TYPE_LABELS[coupon.type]}</td>
                       <td className="py-4 px-4 font-semibold text-gray-900">{formatValue(coupon)}</td>
                       <td className="py-4 px-4 text-gray-700 whitespace-nowrap">
-                        {coupon.minimum_purchase && coupon.minimum_purchase > 0 ? `GH₵ ${Number(coupon.minimum_purchase).toFixed(2)}` : 'No minimum'}
+                        {coupon.minimum_purchase && coupon.minimum_purchase > 0 ? `GH₵ ${money(coupon.minimum_purchase)}` : 'No minimum'}
                       </td>
                       <td className="py-4 px-4">
                         <div className="flex items-center space-x-2">

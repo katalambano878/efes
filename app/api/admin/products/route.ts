@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { requireDbBackend } from '@/lib/api-gate';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 
 function getAccessToken(request: Request): string | null {
@@ -26,9 +27,8 @@ function getAccessToken(request: Request): string | null {
 }
 
 async function requireAdmin(request: Request): Promise<NextResponse | null> {
-  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
-    return NextResponse.json({ error: 'Server misconfiguration' }, { status: 503 });
-  }
+  const gate = requireDbBackend();
+  if (gate) return gate;
   const token = getAccessToken(request);
   if (!token) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
   const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(token);
@@ -45,7 +45,7 @@ async function requireAdmin(request: Request): Promise<NextResponse | null> {
   return null;
 }
 
-const PLACEHOLDER_IMAGE = 'https://via.placeholder.com/300?text=No+Image';
+const PLACEHOLDER_IMAGE = '/logo-efes.png';
 
 /**
  * GET /api/admin/products

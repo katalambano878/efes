@@ -10,7 +10,7 @@ export type SearchSuggestionItem = {
 };
 
 const PLACEHOLDER =
-  'https://via.placeholder.com/72x72/f3f4f6/9ca3af?text=%E2%80%A2';
+  '/logo-efes.png';
 
 type Props = {
   query: string;

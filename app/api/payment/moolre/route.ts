@@ -103,7 +103,7 @@ export async function POST(req: Request) {
             email: process.env.MOOLRE_MERCHANT_EMAIL || 'admin@example.com',
             externalref: uniqueRef,
             callback: `${baseUrl}/api/payment/moolre/callback`,
-            redirect: `${baseUrl}/order-success?order=${orderRef}&payment_success=true`,
+            redirect: `${baseUrl}/order-success?order=${encodeURIComponent(orderRef)}&email=${encodeURIComponent(customerEmail || order.email || '')}&payment_success=true`,
             reusable: "0",
             currency: "GHS",
             accountnumber: process.env.MOOLRE_ACCOUNT_NUMBER,

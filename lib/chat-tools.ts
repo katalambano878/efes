@@ -1,5 +1,7 @@
 // ─── Types ──────────────────────────────────────────────────────────────────
 
+import { money } from '@/lib/format-money';
+
 export type ChatProduct = {
   id: string;
   name: string;
@@ -199,7 +201,7 @@ export async function checkCoupon(
   if (data.end_date && new Date(data.end_date) < now) return { valid: false, code: trimmed, reason: 'This coupon has expired.' };
   if (data.usage_limit && data.usage_count >= data.usage_limit) return { valid: false, code: trimmed, reason: 'This coupon has reached its usage limit.' };
   if (cartTotal !== undefined && data.minimum_purchase && cartTotal < Number(data.minimum_purchase)) {
-    return { valid: false, code: trimmed, reason: `Minimum purchase of GH₵${Number(data.minimum_purchase).toFixed(2)} required.` };
+    return { valid: false, code: trimmed, reason: `Minimum purchase of GH₵${money(data.minimum_purchase)} required.` };
   }
 
   return {
@@ -652,7 +654,7 @@ export async function createChatOrder(
             success: true,
             orderNumber,
             total,
-            message: `Order ${orderNumber} created (GH₵${total.toFixed(2)}), but payment gateway is not configured. Please complete payment through the website.`,
+            message: `Order ${orderNumber} created (GH₵${money(total)}), but payment gateway is not configured. Please complete payment through the website.`,
           };
         }
 
@@ -663,7 +665,7 @@ export async function createChatOrder(
           email: process.env.MOOLRE_MERCHANT_EMAIL || 'contact@example.com',
           externalref: uniqueRef,
           callback: `${baseUrl}/api/payment/moolre/callback`,
-          redirect: `${baseUrl}/order-success?order=${orderNumber}&payment_success=true`,
+          redirect: `${baseUrl}/order-success?order=${encodeURIComponent(orderNumber)}&email=${encodeURIComponent(sanitizedShipping.email || '')}&payment_success=true`,
           reusable: '0',
           currency: 'GHS',
           accountnumber: moolreAccountNumber,
@@ -691,14 +693,14 @@ export async function createChatOrder(
             orderNumber,
             total,
             paymentUrl: result.data.authorization_url,
-            message: `Order ${orderNumber} created successfully! Total: GH₵${total.toFixed(2)} (including GH₵${shippingCost.toFixed(2)} delivery). Please complete your payment using the link below.`,
+            message: `Order ${orderNumber} created successfully! Total: GH₵${money(total)} (including GH₵${money(shippingCost)} delivery). Please complete your payment using the link below.`,
           };
         } else {
           return {
             success: true,
             orderNumber,
             total,
-            message: `Order ${orderNumber} created (GH₵${total.toFixed(2)}), but we couldn't generate a payment link. Please visit your order page to complete payment.`,
+            message: `Order ${orderNumber} created (GH₵${money(total)}), but we couldn't generate a payment link. Please visit your order page to complete payment.`,
           };
         }
       } catch (payErr: any) {
@@ -707,7 +709,7 @@ export async function createChatOrder(
           success: true,
           orderNumber,
           total,
-          message: `Order ${orderNumber} created (GH₵${total.toFixed(2)}), but payment initiation failed. Please visit the website to complete payment.`,
+          message: `Order ${orderNumber} created (GH₵${money(total)}), but payment initiation failed. Please visit the website to complete payment.`,
         };
       }
     }
@@ -717,7 +719,7 @@ export async function createChatOrder(
       success: true,
       orderNumber,
       total,
-      message: `Order ${orderNumber} placed successfully! Total: GH₵${total.toFixed(2)} (including GH₵${shippingCost.toFixed(2)} delivery). Payment: Cash on Delivery. Your order will be delivered to ${sanitizedShipping.address}, ${sanitizedShipping.city}.`,
+      message: `Order ${orderNumber} placed successfully! Total: GH₵${money(total)} (including GH₵${money(shippingCost)} delivery). Payment: Cash on Delivery. Your order will be delivered to ${sanitizedShipping.address}, ${sanitizedShipping.city}.`,
     };
   } catch (err: any) {
     console.error('[ChatTools] createChatOrder error:', err);
