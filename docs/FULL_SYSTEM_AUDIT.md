@@ -18,7 +18,7 @@
 | `/admin/login` | 200 |
 | `/rest/v1/*` shim | 200 |
 | Pre-repair image SHA | `0a365cd` |
-| Post-repair | This audit wave (deploy and confirm live container SHA matches commit) |
+| Post-repair commit | `54c2459` (deployed to `efes-app`; live probes: `/` `/shop` `/rest` 200; order lookup 400 on empty body; Moolre callback 403 without secret) |
 
 Cutover trio live in Coolify: `DATABASE_URL`, `NEXT_PUBLIC_USE_PLAIN_PG=true`, `NEXT_PUBLIC_SUPABASE_URL=https://www.efescloset.com`.
 
