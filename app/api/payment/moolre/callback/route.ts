@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { sendOrderConfirmation } from '@/lib/notifications';
 import { checkRateLimit, getClientIdentifier, RATE_LIMITS } from '@/lib/rate-limit';
+import { finalizePaymentCallbackEvent, recordPaymentCallbackEvent } from '@/lib/payment-events';
 
 /**
  * Moolre Callback Payload Structure (from their actual API):
@@ -124,6 +125,23 @@ export async function POST(req: Request) {
             return NextResponse.json({ success: false, message: 'Missing order reference' }, { status: 400 });
         }
 
+        const callbackAmountEarly = data.amount ? parseFloat(data.amount) : (body.amount ? parseFloat(body.amount) : null);
+        const { id: eventId, duplicate } = await recordPaymentCallbackEvent({
+            gateway: 'moolre',
+            eventType: 'payment_callback',
+            externalEventId: data.transactionid ? String(data.transactionid) : null,
+            internalReference: rawExternalRef ? String(rawExternalRef) : null,
+            gatewayReference: String(moolreReference),
+            orderNumber: merchantOrderRef,
+            payload: { status: body.status, data, ts: body.ts },
+            signatureStatus: expectedSecret ? (body.secret === expectedSecret ? 'valid' : 'invalid') : 'unchecked',
+            amountReported: Number.isFinite(callbackAmountEarly as number) ? (callbackAmountEarly as number) : null,
+        });
+        if (duplicate) {
+            await finalizePaymentCallbackEvent(eventId, 'duplicate');
+            return NextResponse.json({ success: true, message: 'Duplicate callback ignored' });
+        }
+
         // ============================================================
         // Verify payment success
         // Moolre: status=1 + data.txtstatus=1 + message contains "successful"
@@ -157,26 +175,30 @@ export async function POST(req: Request) {
 
             if (fetchError || !existingOrder) {
                 console.error('[Callback] Order not found:', merchantOrderRef);
+                await finalizePaymentCallbackEvent(eventId, 'failed', 'Order not found');
                 return NextResponse.json({ success: false, message: 'Order not found' }, { status: 404 });
             }
 
             // Already paid - idempotent
             if (existingOrder.payment_status === 'paid') {
                 console.log('[Callback] Order already paid, skipping:', merchantOrderRef);
+                await finalizePaymentCallbackEvent(eventId, 'duplicate');
                 return NextResponse.json({ success: true, message: 'Order already processed' });
             }
 
             // ============================================================
             // SECURITY: Amount required + must match order total
             // ============================================================
-            const callbackAmount = data.amount ? parseFloat(data.amount) : (body.amount ? parseFloat(body.amount) : null);
+            const callbackAmount = callbackAmountEarly;
             if (callbackAmount === null || !Number.isFinite(callbackAmount)) {
                 console.error('[Callback] Missing amount — REJECTING. Order:', merchantOrderRef);
+                await finalizePaymentCallbackEvent(eventId, 'failed', 'Missing payment amount');
                 return NextResponse.json({ success: false, message: 'Missing payment amount' }, { status: 400 });
             }
             const expectedAmount = Number(existingOrder.total);
             if (Math.abs(callbackAmount - expectedAmount) > 0.01) {
                 console.error('[Callback] AMOUNT MISMATCH — REJECTING! Expected:', expectedAmount, 'Got:', callbackAmount, 'Order:', merchantOrderRef);
+                await finalizePaymentCallbackEvent(eventId, 'failed', 'Amount mismatch');
                 return NextResponse.json({
                     success: false,
                     message: 'Payment amount does not match order total'
@@ -192,15 +214,18 @@ export async function POST(req: Request) {
 
             if (updateError) {
                 console.error('[Callback] RPC Error:', updateError.message);
+                await finalizePaymentCallbackEvent(eventId, 'failed', updateError.message);
                 return NextResponse.json({ success: false, message: 'Database update failed' }, { status: 500 });
             }
 
             if (!orderJson) {
                 console.error('[Callback] Order not found after RPC:', merchantOrderRef);
+                await finalizePaymentCallbackEvent(eventId, 'failed', 'Order not found after RPC');
                 return NextResponse.json({ success: false, message: 'Order not found' }, { status: 404 });
             }
 
             console.log('[Callback] Order updated! ID:', orderJson.id, '| Status:', orderJson.status);
+            await finalizePaymentCallbackEvent(eventId, 'processed');
 
             // Update customer stats
             try {
@@ -226,15 +251,19 @@ export async function POST(req: Request) {
             return NextResponse.json({ success: true, message: 'Payment verified and Order Updated' });
 
         } else {
-            // Payment failed
+            // Payment failed — never overwrite an already-paid order
             console.log(`[Callback] Payment FAILED for ${merchantOrderRef} | Status: ${apiStatus} | TX: ${txStatus}`);
 
-            // Fetch existing metadata so we don't overwrite it
             const { data: failedOrderMeta } = await supabaseAdmin
                 .from('orders')
-                .select('metadata')
+                .select('metadata, payment_status')
                 .eq('order_number', merchantOrderRef)
                 .single();
+
+            if (failedOrderMeta?.payment_status === 'paid') {
+                await finalizePaymentCallbackEvent(eventId, 'ignored', 'Late failure after paid');
+                return NextResponse.json({ success: true, message: 'Order already paid; failure ignored' });
+            }
 
             const mergedFailureMetadata = {
                 ...(failedOrderMeta?.metadata || {}),
@@ -248,7 +277,10 @@ export async function POST(req: Request) {
                     payment_status: 'failed',
                     metadata: mergedFailureMetadata
                 })
-                .eq('order_number', merchantOrderRef);
+                .eq('order_number', merchantOrderRef)
+                .neq('payment_status', 'paid');
+
+            await finalizePaymentCallbackEvent(eventId, 'processed', body.message || 'Payment failed');
 
             return NextResponse.json({ success: false, message: 'Payment not successful' });
         }

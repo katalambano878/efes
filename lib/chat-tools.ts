@@ -243,10 +243,11 @@ export async function createSupportTicket(
     return null;
   }
 
-  await supabase.from('support_messages').insert({
+  await supabase.from('support_ticket_messages').insert({
     ticket_id: ticket.id,
-    user_id: userId || null,
-    message: description,
+    sender_type: userId ? 'customer' : 'system',
+    sender_id: userId || null,
+    content: description,
     is_internal: false,
   });
 

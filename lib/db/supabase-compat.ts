@@ -995,6 +995,82 @@ function createAuthApi() {
   const loadAuth = () => import("./auth");
 
   return {
+    admin: {
+      async createUser(opts: {
+        email: string;
+        password: string;
+        email_confirm?: boolean;
+        user_metadata?: Record<string, unknown>;
+      }) {
+        const auth = await loadAuth();
+        const { user, error } = await auth.signUpWithPassword({
+          email: opts.email,
+          password: opts.password,
+          data: opts.user_metadata,
+        });
+        if (error || !user) {
+          return { data: { user: null }, error: { message: error || "createUser failed" } };
+        }
+        return { data: { user }, error: null };
+      },
+      async updateUserById(
+        userId: string,
+        attrs: { password?: string; user_metadata?: Record<string, unknown>; email?: string }
+      ) {
+        const auth = await loadAuth();
+        if (attrs.password) {
+          const { error } = await auth.updateUserPassword(userId, attrs.password);
+          if (error) return { data: { user: null }, error: { message: error } };
+        }
+        if (attrs.user_metadata) {
+          const { error } = await auth.updateUserMetadata(userId, attrs.user_metadata);
+          if (error) return { data: { user: null }, error: { message: error } };
+        }
+        if (attrs.email) {
+          try {
+            const { query } = await import("./pool");
+            await query(
+              `UPDATE auth.users SET email = $1, updated_at = now() WHERE id = $2`,
+              [attrs.email.trim().toLowerCase(), userId]
+            );
+            await query(
+              `UPDATE profiles SET email = $1, updated_at = now() WHERE id = $2`,
+              [attrs.email.trim().toLowerCase(), userId]
+            ).catch(() => {});
+          } catch (e: any) {
+            return { data: { user: null }, error: { message: e.message || "email update failed" } };
+          }
+        }
+        const user = await auth.getUserById(userId);
+        return { data: { user }, error: user ? null : { message: "User not found" } };
+      },
+      async listUsers({ page = 1, perPage = 50 }: { page?: number; perPage?: number } = {}) {
+        try {
+          const { query } = await import("./pool");
+          const limit = Math.min(Math.max(perPage, 1), 1000);
+          const offset = Math.max(page - 1, 0) * limit;
+          const { rows } = await query(
+            `SELECT id, email, phone, email_confirmed_at, phone_confirmed_at,
+                    last_sign_in_at, raw_app_meta_data, raw_user_meta_data,
+                    created_at, updated_at
+             FROM auth.users
+             WHERE deleted_at IS NULL
+             ORDER BY created_at DESC
+             LIMIT $1 OFFSET $2`,
+            [limit, offset]
+          );
+          const auth = await loadAuth();
+          const users = [];
+          for (const row of rows) {
+            const u = await auth.getUserById(row.id as string);
+            if (u) users.push(u);
+          }
+          return { data: { users }, error: null };
+        } catch (e: any) {
+          return { data: { users: [] }, error: { message: e.message || "listUsers failed" } };
+        }
+      },
+    },
     async signInWithPassword({ email, password }: { email: string; password: string }) {
       const auth = await loadAuth();
       const { session, error } = await auth.signInWithPassword(email, password);

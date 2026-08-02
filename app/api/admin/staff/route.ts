@@ -125,8 +125,7 @@ export async function POST(request: Request) {
     });
   }
 
-  // Create new user via Supabase Auth Admin API
-  // TODO: auth.admin.createUser is not yet in plain-PG compat
+  // Create user via plain-PG auth.admin compat
   const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
     email: email.toLowerCase().trim(),
     password,

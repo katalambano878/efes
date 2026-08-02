@@ -4,6 +4,7 @@ import {
   applyPostgrestParams,
 } from "@/lib/db/supabase-compat";
 import { isPlainPostgres } from "@/lib/db/mode";
+import { authorizeRestAccess, resolveRestAuth } from "@/lib/db/rest-auth";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -41,6 +42,24 @@ function jsonError(message: string, status = 400) {
   );
 }
 
+async function gate(
+  req: NextRequest,
+  table: string,
+  method: string
+): Promise<NextResponse | null> {
+  if (!isPlainPostgres()) {
+    return jsonError("Plain Postgres mode is not enabled (DATABASE_URL missing)", 503);
+  }
+  if (!PG_IDENT.test(table)) return jsonError("Invalid table");
+
+  const auth = await resolveRestAuth(req);
+  const decision = authorizeRestAccess(auth, table, method);
+  if (!decision.ok) {
+    return jsonError(decision.message, decision.status);
+  }
+  return null;
+}
+
 export async function OPTIONS() {
   return new NextResponse(null, { status: 204, headers: corsHeaders() });
 }
@@ -49,11 +68,9 @@ export async function GET(
   req: NextRequest,
   ctx: { params: Promise<{ table: string }> }
 ) {
-  if (!isPlainPostgres()) {
-    return jsonError("Plain Postgres mode is not enabled (DATABASE_URL missing)", 503);
-  }
   const { table } = await ctx.params;
-  if (!PG_IDENT.test(table)) return jsonError("Invalid table");
+  const denied = await gate(req, table, "GET");
+  if (denied) return denied;
 
   const client = createClient();
   const qb = client.from(table);
@@ -66,7 +83,6 @@ export async function GET(
   } else {
     qb.select(select);
   }
-  // Apply filters/order/limit without re-applying select
   const params = new URLSearchParams(req.nextUrl.searchParams);
   params.delete("select");
   applyPostgrestParams(qb as any, params, {
@@ -96,11 +112,9 @@ export async function POST(
   req: NextRequest,
   ctx: { params: Promise<{ table: string }> }
 ) {
-  if (!isPlainPostgres()) {
-    return jsonError("Plain Postgres mode is not enabled (DATABASE_URL missing)", 503);
-  }
   const { table } = await ctx.params;
-  if (!PG_IDENT.test(table)) return jsonError("Invalid table");
+  const denied = await gate(req, table, "POST");
+  if (denied) return denied;
 
   const body = await req.json().catch(() => null);
   if (body == null) return jsonError("Invalid JSON body");
@@ -125,11 +139,9 @@ export async function PATCH(
   req: NextRequest,
   ctx: { params: Promise<{ table: string }> }
 ) {
-  if (!isPlainPostgres()) {
-    return jsonError("Plain Postgres mode is not enabled (DATABASE_URL missing)", 503);
-  }
   const { table } = await ctx.params;
-  if (!PG_IDENT.test(table)) return jsonError("Invalid table");
+  const denied = await gate(req, table, "PATCH");
+  if (denied) return denied;
 
   const body = await req.json().catch(() => null);
   if (body == null || typeof body !== "object") return jsonError("Invalid JSON body");
@@ -152,11 +164,9 @@ export async function DELETE(
   req: NextRequest,
   ctx: { params: Promise<{ table: string }> }
 ) {
-  if (!isPlainPostgres()) {
-    return jsonError("Plain Postgres mode is not enabled (DATABASE_URL missing)", 503);
-  }
   const { table } = await ctx.params;
-  if (!PG_IDENT.test(table)) return jsonError("Invalid table");
+  const denied = await gate(req, table, "DELETE");
+  if (denied) return denied;
 
   const client = createClient();
   let qb = client.from(table).delete();

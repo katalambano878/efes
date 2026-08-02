@@ -57,10 +57,8 @@ export async function POST(req: NextRequest) {
             updated_at: new Date().toISOString(),
         }).eq('id', authUserId);
         // Reset their password so the admin can hand it over
-        // TODO: auth.admin (createUser/updateUserById) is not yet in plain-PG compat
         await supabaseAdmin.auth.admin.updateUserById(authUserId, { password });
     } else {
-        // TODO: auth.admin (createUser/updateUserById) is not yet in plain-PG compat
         const { data: created, error: createErr } = await supabaseAdmin.auth.admin.createUser({
             email: cleanEmail,
             password,
