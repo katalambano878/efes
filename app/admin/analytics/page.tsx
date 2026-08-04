@@ -47,7 +47,8 @@ export default function AnalyticsPage() {
         .gte('created_at', isoStart)
         .eq('payment_status', 'paid') // Only count paid orders as revenue
         .neq('status', 'cancelled')
-        .order('created_at');
+        .order('created_at')
+        .limit(2000);
 
       if (orderError) throw orderError;
 

@@ -1,9 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
+import { fetchWithTimeout, withTimeout } from '@/lib/fetch-timeout';
 
 export default function AdminLayout({
   children,
@@ -15,55 +16,79 @@ export default function AdminLayout({
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [authError, setAuthError] = useState<string | null>(null);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [user, setUser] = useState<any>(null);
   const [userRole, setUserRole] = useState<string | null>(null);
+  const authCheckedRef = useRef(false);
 
   // Module Filtering State
   const [enabledModules, setEnabledModules] = useState<string[]>([]);
   const [rolePermissions, setRolePermissions] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
+    let cancelled = false;
+
     async function checkAuth() {
+      // Login page: never block on session
+      if (pathname === '/admin/login') {
+        setIsLoading(false);
+        setAuthError(null);
+        return;
+      }
+
+      // After first success, don't re-show the global spinner on every navigation
+      if (authCheckedRef.current && isAuthenticated) {
+        return;
+      }
+
+      setIsLoading(true);
+      setAuthError(null);
+
       try {
-        const { data: { session } } = await supabase.auth.getSession();
+        const sessionResult = await withTimeout(
+          supabase.auth.getSession(),
+          8_000,
+          'Session check'
+        );
+        if (cancelled) return;
 
-        if (pathname === '/admin/login') {
-          setIsLoading(false);
+        const session = sessionResult?.data?.session;
+        if (!session?.access_token) {
+          router.replace('/admin/login');
           return;
         }
 
-        if (!session) {
-          router.push('/admin/login');
-          return;
-        }
-
-        const accessToken = session?.access_token;
-        if (!accessToken || typeof accessToken !== 'string') {
-          router.push('/admin/login');
-          return;
-        }
-
-        const secure = typeof window !== 'undefined' && window.location.protocol === 'https:' ? '; Secure' : '';
+        const accessToken = session.access_token;
+        const secure =
+          typeof window !== 'undefined' && window.location.protocol === 'https:'
+            ? '; Secure'
+            : '';
         try {
           document.cookie = `sb-access-token=${accessToken}; path=/; max-age=${60 * 60 * 24 * 7}; SameSite=Lax${secure}`;
-        } catch (_) { }
+        } catch (_) {}
 
-        const meRes = await fetch('/api/admin/me', {
-          credentials: 'include',
-          headers: { Authorization: `Bearer ${accessToken}` },
-        });
+        const meRes = await fetchWithTimeout(
+          '/api/admin/me',
+          {
+            credentials: 'include',
+            headers: { Authorization: `Bearer ${accessToken}` },
+          },
+          12_000
+        );
+        if (cancelled) return;
 
         if (!meRes.ok) {
           let errBody: { error?: string } = {};
           try {
             const text = await meRes.text();
             if (text) errBody = JSON.parse(text);
-          } catch (_) { }
-          if (meRes.status === 503) router.push('/admin/login?error=config');
-          else if (meRes.status === 404) router.push('/admin/login?error=no_profile');
-          else if (meRes.status === 403 && errBody?.error === 'Role disabled') router.push('/admin/login?error=role_disabled');
-          else router.push('/admin/login');
+          } catch (_) {}
+          if (meRes.status === 503) router.replace('/admin/login?error=config');
+          else if (meRes.status === 404) router.replace('/admin/login?error=no_profile');
+          else if (meRes.status === 403 && errBody?.error === 'Role disabled')
+            router.replace('/admin/login?error=role_disabled');
+          else router.replace('/admin/login?error=session_expired');
           return;
         }
 
@@ -72,51 +97,74 @@ export default function AdminLayout({
         try {
           const json = await meRes.json();
           profileData = json?.profile ?? null;
-          permissions = (json?.permissions && typeof json.permissions === 'object') ? json.permissions : {};
+          permissions =
+            json?.permissions && typeof json.permissions === 'object'
+              ? json.permissions
+              : {};
         } catch (_) {
-          router.push('/admin/login');
-          return;
-        }
-        const role = profileData?.role != null ? String(profileData.role) : '';
-        if (role !== 'admin' && role !== 'staff' && role !== 'rider') {
-          document.cookie = `sb-access-token=; path=/; max-age=0; SameSite=Lax${secure}`;
-          await supabase.auth.signOut();
-          router.push('/admin/login?error=unauthorized');
+          router.replace('/admin/login?error=session_expired');
           return;
         }
 
+        const role = profileData?.role != null ? String(profileData.role) : '';
+        if (role !== 'admin' && role !== 'staff' && role !== 'rider') {
+          document.cookie = `sb-access-token=; path=/; max-age=0; SameSite=Lax${secure}`;
+          void withTimeout(supabase.auth.signOut(), 5_000, 'Sign out').catch(() => {});
+          router.replace('/admin/login?error=unauthorized');
+          return;
+        }
+
+        if (cancelled) return;
         setUser(session.user);
         setUserRole(role);
         if (Object.keys(permissions).length > 0) setRolePermissions(permissions);
         setIsAuthenticated(true);
+        authCheckedRef.current = true;
 
-        // Riders have a restricted view — send them straight to their deliveries
         if (role === 'rider' && (pathname === '/admin' || pathname === '/admin/login')) {
           router.replace('/admin/delivery/my-deliveries');
         }
-      } catch {
-        router.push('/admin/login');
+      } catch (err: any) {
+        if (cancelled) return;
+        const timedOut = /timed out|abort/i.test(String(err?.message || err || ''));
+        setAuthError(
+          timedOut
+            ? 'Admin authentication timed out. Check your connection and try again.'
+            : 'Could not verify admin session.'
+        );
+        // Soft-fail: allow retry UI instead of a permanent spinner
       } finally {
-        setIsLoading(false);
+        if (!cancelled) setIsLoading(false);
       }
     }
 
     checkAuth();
 
-    // Keep cookie in sync when session refreshes
-    const secure = typeof window !== 'undefined' && window.location.protocol === 'https:' ? '; Secure' : '';
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+    const secure =
+      typeof window !== 'undefined' && window.location.protocol === 'https:'
+        ? '; Secure'
+        : '';
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'TOKEN_REFRESHED' && session) {
         document.cookie = `sb-access-token=${session.access_token}; path=/; max-age=${60 * 60 * 24 * 7}; SameSite=Lax${secure}`;
       }
       if (event === 'SIGNED_OUT') {
+        authCheckedRef.current = false;
+        setIsAuthenticated(false);
         document.cookie = `sb-access-token=; path=/; max-age=0; SameSite=Lax${secure}`;
         document.cookie = `sb-refresh-token=; path=/; max-age=0; SameSite=Lax${secure}`;
       }
     });
 
-    return () => subscription.unsubscribe();
-  }, [pathname, router]);
+    return () => {
+      cancelled = true;
+      subscription.unsubscribe();
+    };
+    // Re-check only when entering/leaving login; not on every admin path change.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname === '/admin/login']);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -175,7 +223,38 @@ export default function AdminLayout({
   };
 
   if (isLoading) {
-    return <div className="min-h-screen flex items-center justify-center bg-gray-50 text-gray-500">Loading Admin...</div>;
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 text-gray-500 gap-3 px-4">
+        <div className="w-8 h-8 border-2 border-gray-300 border-t-gray-800 rounded-full animate-spin" />
+        <p>Loading Admin…</p>
+        <p className="text-xs text-gray-400">This should finish within a few seconds.</p>
+      </div>
+    );
+  }
+
+  if (authError && pathname !== '/admin/login' && !isAuthenticated) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 px-4 text-center gap-4">
+        <p className="text-gray-800 font-medium">{authError}</p>
+        <div className="flex gap-3">
+          <button
+            type="button"
+            className="px-4 py-2 rounded-lg bg-gray-900 text-white text-sm"
+            onClick={() => {
+              authCheckedRef.current = false;
+              setAuthError(null);
+              setIsLoading(true);
+              window.location.reload();
+            }}
+          >
+            Retry
+          </button>
+          <Link href="/admin/login" className="px-4 py-2 rounded-lg border text-sm text-gray-700">
+            Back to login
+          </Link>
+        </div>
+      </div>
+    );
   }
 
   const menuItems = [

@@ -38,12 +38,29 @@ export function getPool(): Pool {
     connectionString,
     max: Number(process.env.PG_POOL_MAX || 10),
     idleTimeoutMillis: 30_000,
+    connectionTimeoutMillis: Number(process.env.PG_CONNECT_TIMEOUT_MS || 8_000),
     // Self-hosted Postgres on the same host / private network: TLS optional.
     ssl:
       process.env.PGSSL === "require"
         ? { rejectUnauthorized: false }
         : undefined,
   });
+
+  // Cap runaway queries so a single admin/report cannot exhaust the pool.
+  const statementTimeoutMs = Number(process.env.PG_STATEMENT_TIMEOUT_MS || 15_000);
+  const idleTxTimeoutMs = Number(
+    process.env.PG_IDLE_TX_TIMEOUT_MS || 30_000
+  );
+  _pool.on("connect", (client) => {
+    void client
+      .query(
+        `SET statement_timeout = ${Math.max(1_000, statementTimeoutMs)};
+         SET idle_in_transaction_session_timeout = ${Math.max(1_000, idleTxTimeoutMs)};
+         SET lock_timeout = ${Math.max(1_000, Math.min(statementTimeoutMs, 10_000))}`
+      )
+      .catch(() => {});
+  });
+
   return _pool;
 }
 

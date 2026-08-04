@@ -15,13 +15,23 @@ export default function KnowledgeBasePage() {
 
   const fetchArticles = useCallback(async () => {
     setLoading(true);
-    const params = new URLSearchParams();
-    if (search) params.set('search', search);
-    if (categoryFilter) params.set('category', categoryFilter);
-    const res = await fetch(`/api/support/knowledge-base?${params}`);
-    const data = await res.json();
-    setArticles(data.data || []);
-    setLoading(false);
+    try {
+      const params = new URLSearchParams();
+      if (search) params.set('search', search);
+      if (categoryFilter) params.set('category', categoryFilter);
+      const res = await fetch(`/api/support/knowledge-base?${params}`);
+      if (!res.ok) {
+        setArticles([]);
+        return;
+      }
+      const data = await res.json();
+      setArticles(data.data || []);
+    } catch (e) {
+      console.error('Knowledge base load failed:', e);
+      setArticles([]);
+    } finally {
+      setLoading(false);
+    }
   }, [search, categoryFilter]);
 
   useEffect(() => { fetchArticles(); }, [fetchArticles]);

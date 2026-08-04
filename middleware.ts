@@ -40,7 +40,10 @@ function extractToken(request: NextRequest): string | undefined {
   return token;
 }
 
-async function verifyPlainPgAdmin(token: string): Promise<{ ok: boolean; userId?: string; role?: string }> {
+async function verifyPlainPgAdmin(
+  token: string,
+  pathname: string
+): Promise<{ ok: boolean; userId?: string; role?: string }> {
   const secret =
     process.env.AUTH_JWT_SECRET ||
     process.env.JWT_SECRET ||
@@ -54,8 +57,17 @@ async function verifyPlainPgAdmin(token: string): Promise<{ ok: boolean; userId?
     if (!userId) return { ok: false };
     const appMeta = (payload.app_metadata || {}) as { role?: string };
     const role = appMeta.role;
-    if (role !== 'admin' && role !== 'staff') return { ok: false };
-    return { ok: true, userId, role };
+    if (role === 'admin' || role === 'staff') {
+      return { ok: true, userId, role };
+    }
+    // Riders may only access delivery routes (and login redirect targets).
+    if (
+      role === 'rider' &&
+      (pathname.startsWith('/admin/delivery') || pathname === '/admin')
+    ) {
+      return { ok: true, userId, role };
+    }
+    return { ok: false };
   } catch {
     return { ok: false };
   }
@@ -86,13 +98,15 @@ export async function middleware(request: NextRequest) {
     }
 
     if (usePlainPg) {
-      const verified = await verifyPlainPgAdmin(token);
+      const verified = await verifyPlainPgAdmin(token, pathname);
       if (!verified.ok) {
         const loginUrl = new URL('/admin/login', request.url);
         loginUrl.searchParams.set('redirect', pathname);
         loginUrl.searchParams.set('error', 'session_expired');
         return NextResponse.redirect(loginUrl);
       }
+      // Riders hitting /admin get bounced to their deliveries by the layout;
+      // middleware allows /admin so the layout can redirect without a loop.
       if (verified.userId) response.headers.set('x-user-id', verified.userId);
       if (verified.role) response.headers.set('x-user-role', verified.role);
       return response;

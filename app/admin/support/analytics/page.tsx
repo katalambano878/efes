@@ -13,10 +13,20 @@ export default function SupportAnalyticsPage() {
 
   const fetchAnalytics = useCallback(async () => {
     setLoading(true);
-    const res = await fetch(`/api/support/analytics?days=${days}`);
-    const json = await res.json();
-    setData(json);
-    setLoading(false);
+    try {
+      const res = await fetch(`/api/support/analytics?days=${days}`);
+      if (!res.ok) {
+        setData(null);
+        return;
+      }
+      const json = await res.json();
+      setData(json);
+    } catch (e) {
+      console.error('Support analytics load failed:', e);
+      setData(null);
+    } finally {
+      setLoading(false);
+    }
   }, [days]);
 
   useEffect(() => { fetchAnalytics(); }, [fetchAnalytics]);
