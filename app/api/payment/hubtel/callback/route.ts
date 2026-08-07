@@ -151,8 +151,10 @@ export async function POST(req: Request) {
             const status = await checkHubtelStatus(rawClientReference || merchantOrderRef);
             const sStatus = String(status?.data?.status || '').toLowerCase();
             serverConfirmed = isHubtelPaid(sStatus, status?.responseCode);
-            const settlement =
-                status?.data?.amountAfterCharges ?? status?.data?.amount;
+            // Prefer gross amount the customer paid — NOT amountAfterCharges
+            // (merchant settlement after Hubtel fees), which is lower and was
+            // incorrectly rejecting paid callbacks as amount mismatches.
+            const settlement = status?.data?.amount ?? status?.data?.amountAfterCharges;
             if (settlement !== undefined && settlement !== null) {
                 const n = parseFloat(String(settlement));
                 if (Number.isFinite(n)) confirmedSettlement = n;

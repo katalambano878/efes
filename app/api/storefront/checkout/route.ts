@@ -35,9 +35,16 @@ export async function POST(request: Request) {
       cart,
     } = body;
 
-    if (!orderNumber || !email || !cart?.length || !shippingData) {
+    if (!orderNumber || !cart?.length || !shippingData) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
+
+    const emailTrimmed = typeof email === 'string' ? email.trim() : '';
+    if (emailTrimmed && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailTrimmed)) {
+      return NextResponse.json({ error: 'Invalid email address' }, { status: 400 });
+    }
+    // Email is optional for guests; DB column is NOT NULL so store empty string when omitted.
+    const orderEmail = emailTrimmed;
 
     // Resolve products + variants and reprice from DB
     const lineItems: Array<{
@@ -181,7 +188,7 @@ export async function POST(request: Request) {
         {
           order_number: orderNumber,
           user_id: userId || null,
-          email,
+          email: orderEmail,
           phone,
           status: 'pending',
           payment_status: 'pending',
@@ -223,18 +230,20 @@ export async function POST(request: Request) {
     }
 
     const fullName = `${shippingData.firstName || ''} ${shippingData.lastName || ''}`.trim();
-    try {
-      await supabaseAdmin.rpc('upsert_customer_from_order', {
-        p_email: shippingData.email || email,
-        p_phone: shippingData.phone || phone,
-        p_full_name: fullName,
-        p_first_name: shippingData.firstName,
-        p_last_name: shippingData.lastName,
-        p_user_id: userId || null,
-        p_address: shippingData,
-      });
-    } catch (e: any) {
-      console.warn('upsert_customer_from_order warning:', e.message);
+    if (orderEmail) {
+      try {
+        await supabaseAdmin.rpc('upsert_customer_from_order', {
+          p_email: orderEmail,
+          p_phone: shippingData.phone || phone,
+          p_full_name: fullName,
+          p_first_name: shippingData.firstName,
+          p_last_name: shippingData.lastName,
+          p_user_id: userId || null,
+          p_address: shippingData,
+        });
+      } catch (e: any) {
+        console.warn('upsert_customer_from_order warning:', e.message);
+      }
     }
 
     // Coupon usage should increment on paid — still best-effort at checkout for now

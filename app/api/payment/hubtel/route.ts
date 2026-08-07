@@ -327,7 +327,14 @@ export async function POST(req: Request) {
 
         const baseUrl = getPublicSiteUrl();
 
-        const defaultRedirectUrl = `${baseUrl}/order-success?order=${encodeURIComponent(orderRef)}&email=${encodeURIComponent(customerEmail || order.email || '')}&payment_success=true`;
+        const successParams = new URLSearchParams({
+            order: orderRef,
+            payment_success: 'true',
+        });
+        const redirectEmail = customerEmail || order.email || '';
+        if (redirectEmail) successParams.set('email', redirectEmail);
+        else if (order.phone) successParams.set('phone', String(order.phone));
+        const defaultRedirectUrl = `${baseUrl}/order-success?${successParams.toString()}`;
         const allowedPrefixes = ['https://'];
         const safeRedirectUrl =
             typeof redirectUrl === 'string' &&

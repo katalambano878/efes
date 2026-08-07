@@ -42,8 +42,9 @@ export async function POST(req: Request) {
             return NextResponse.json({ success: false, message: 'Missing or invalid orderNumber' }, { status: 400 });
         }
 
-        if (!email || typeof email !== 'string' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
-            return NextResponse.json({ success: false, message: 'Valid email is required' }, { status: 400 });
+        const emailTrimmed = typeof email === 'string' ? email.trim() : '';
+        if (emailTrimmed && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailTrimmed)) {
+            return NextResponse.json({ success: false, message: 'Invalid email' }, { status: 400 });
         }
 
         if (!/^ORD-\d+-\d+$/.test(orderNumber)) {
@@ -63,9 +64,13 @@ export async function POST(req: Request) {
             return NextResponse.json({ success: false, message: 'Order not found' }, { status: 404 });
         }
 
-        if (order.email?.toLowerCase() !== email.trim().toLowerCase()) {
-            console.warn('[Hubtel Verify] Email mismatch for order:', orderNumber);
-            return NextResponse.json({ success: false, message: 'Order not found' }, { status: 404 });
+        // Email is optional at checkout. When present on the order, require a match;
+        // when the order has no email, allow verify by order number alone (rate-limited).
+        if (order.email) {
+            if (!emailTrimmed || order.email.toLowerCase() !== emailTrimmed.toLowerCase()) {
+                console.warn('[Hubtel Verify] Email mismatch for order:', orderNumber);
+                return NextResponse.json({ success: false, message: 'Order not found' }, { status: 404 });
+            }
         }
 
         if (order.payment_status === 'paid') {
@@ -113,7 +118,8 @@ export async function POST(req: Request) {
             const status = await checkHubtelStatus(clientReference);
             const sStatus = String(status?.data?.status || '').toLowerCase();
             verified = isHubtelPaid(sStatus, status?.responseCode);
-            const settlement = status?.data?.amountAfterCharges ?? status?.data?.amount;
+            // Prefer gross customer-paid amount over amountAfterCharges (net after fees).
+            const settlement = status?.data?.amount ?? status?.data?.amountAfterCharges;
             if (settlement !== undefined && settlement !== null) {
                 const n = parseFloat(String(settlement));
                 if (Number.isFinite(n)) settlementAmount = n;

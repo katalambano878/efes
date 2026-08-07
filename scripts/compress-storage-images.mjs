@@ -120,7 +120,7 @@ async function main() {
     rootArg || process.env.STORAGE_ROOT || path.join(process.cwd(), '.storage')
   );
 
-  const buckets = ['products'];
+  const buckets = ['products', 'media'];
   let processed = 0;
   let skipped = 0;
   let saved = 0;

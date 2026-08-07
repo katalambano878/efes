@@ -98,8 +98,9 @@ export default function CheckoutPage() {
     const newErrors: any = {};
     if (!shippingData.firstName) newErrors.firstName = 'First name is required';
     if (!shippingData.lastName) newErrors.lastName = 'Last name is required';
-    if (!shippingData.email) newErrors.email = 'Email is required';
-    else if (!/\S+@\S+\.\S+/.test(shippingData.email)) newErrors.email = 'Invalid email';
+    if (shippingData.email && !/\S+@\S+\.\S+/.test(shippingData.email)) {
+      newErrors.email = 'Invalid email';
+    }
     if (!shippingData.phone) {
       newErrors.phone = 'Phone number is required';
     } else {
@@ -244,9 +245,10 @@ export default function CheckoutPage() {
 
       // 6. Clear Cart & Redirect (For COD)
       clearCart();
-      router.push(
-        `/order-success?order=${encodeURIComponent(orderNumber)}&email=${encodeURIComponent(shippingData.email || '')}`
-      );
+      const successQs = new URLSearchParams({ order: orderNumber });
+      if (shippingData.email) successQs.set('email', shippingData.email);
+      else if (normalizedPhone) successQs.set('phone', normalizedPhone);
+      router.push(`/order-success?${successQs.toString()}`);
 
     } catch (err: any) {
       console.error('Checkout error:', err);
@@ -375,7 +377,7 @@ export default function CheckoutPage() {
 
                     <div>
                       <label className="block text-sm font-semibold text-gray-900 mb-2">
-                        Email Address *
+                        Email Address
                       </label>
                       <input
                         type="email"
@@ -384,7 +386,7 @@ export default function CheckoutPage() {
                         onChange={(e) => setShippingData({ ...shippingData, email: e.target.value })}
                         className={`w-full px-4 py-3 border-2 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-gray-900 ${errors.email ? 'border-red-500' : 'border-gray-300'
                           } ${user ? 'bg-gray-100 cursor-not-allowed' : ''}`}
-                        placeholder="you@example.com"
+                        placeholder="Optional"
                       />
                       {errors.email && <p className="text-sm text-red-600 mt-1">{errors.email}</p>}
                     </div>

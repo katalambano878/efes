@@ -9,17 +9,18 @@ function OrderSuccessContent() {
   const searchParams = useSearchParams();
   const orderNumber = searchParams.get('order');
   const emailParam = searchParams.get('email') || '';
+  const phoneParam = searchParams.get('phone') || '';
   const paymentSuccess = searchParams.get('payment_success');
   const [order, setOrder] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [showConfetti, setShowConfetti] = useState(true);
   const [verifying, setVerifying] = useState(false);
 
-  async function lookupOrder(orderNum: string, email: string) {
+  async function lookupOrder(orderNum: string, email: string, phone?: string) {
     const res = await fetch('/api/storefront/orders/lookup', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ orderNumber: orderNum, email }),
+      body: JSON.stringify({ orderNumber: orderNum, email, phone: phone || undefined }),
     });
     if (!res.ok) return null;
     const data = await res.json();
@@ -28,13 +29,13 @@ function OrderSuccessContent() {
 
   useEffect(() => {
     async function fetchOrder() {
-      if (!orderNumber || !emailParam) {
+      if (!orderNumber || (!emailParam && !phoneParam)) {
         setLoading(false);
         return;
       }
 
       try {
-        const orderData = await lookupOrder(orderNumber, emailParam);
+        const orderData = await lookupOrder(orderNumber, emailParam, phoneParam);
         if (!orderData) throw new Error('not found');
         setOrder(orderData);
 
@@ -49,7 +50,7 @@ function OrderSuccessContent() {
     }
     fetchOrder();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [orderNumber, emailParam, paymentSuccess]);
+  }, [orderNumber, emailParam, phoneParam, paymentSuccess]);
 
   const verifyPayment = async (orderNum: string, initialOrder: any) => {
     setVerifying(true);
@@ -114,9 +115,9 @@ function OrderSuccessContent() {
           <i className="ri-error-warning-line text-4xl text-red-500 mb-4 block"></i>
           <h1 className="text-2xl font-bold text-gray-900 mb-2">Order Not Found</h1>
           <p className="text-gray-600 mb-6">
-            {!emailParam
-              ? 'Open this page from checkout, or use Order Tracking with your order number and email.'
-              : "We couldn't locate the order for that email."}
+            {!emailParam && !phoneParam
+              ? 'Open this page from checkout, or use Order Tracking with your order number and email or phone.'
+              : "We couldn't locate the order with those details."}
           </p>
           <Link href="/order-tracking" className="text-gray-900 font-semibold hover:underline mr-4">
             Track order

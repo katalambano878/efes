@@ -293,11 +293,15 @@ ${emailButton('Track Your Order', trackingUrl)}
 <p style="color:#9ca3af;font-size:12px;text-align:center;margin:0;">Or copy this link: <a href="${trackingUrl}" style="color:${BRAND.color};">${trackingUrl}</a></p>
 `, `Your order #${order_number || id} is confirmed!`);
 
-    await sendEmail({
-        to: email,
-        subject: `Order Confirmed! #${order_number || id}`,
-        html: customerEmailHtml
-    });
+    if (email && String(email).includes('@')) {
+        await sendEmail({
+            to: email,
+            subject: `Order Confirmed! #${order_number || id}`,
+            html: customerEmailHtml
+        });
+    } else {
+        console.log(`[Notification] Skipping customer email for ${order_number} (no email provided)`);
+    }
 
     // 2. Email to Admin
     const adminEmailHtml = emailLayout(`
@@ -306,7 +310,7 @@ ${emailButton('Track Your Order', trackingUrl)}
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f9fafb;border-radius:12px;overflow:hidden;margin:16px 0;">
   ${emailInfoRow('Order', `#${order_number || id}`)}
   ${emailInfoRow('Customer', `${name}`)}
-  ${emailInfoRow('Email', email)}
+  ${emailInfoRow('Email', email || '—')}
   ${emailInfoRow('Total', `GH₵${Number(total).toFixed(2)}`)}
   ${trackingNumber ? emailInfoRow('Tracking', trackingNumber) : ''}
 </table>

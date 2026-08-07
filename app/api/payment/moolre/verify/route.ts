@@ -37,8 +37,9 @@ export async function POST(req: Request) {
         }
 
         const emailNorm = typeof email === 'string' ? email.trim().toLowerCase() : '';
-        if (!emailNorm || !emailNorm.includes('@')) {
-            return NextResponse.json({ success: false, message: 'Email is required' }, { status: 400 });
+        // Email optional at checkout — when order has no email, allow verify by order number.
+        if (emailNorm && !emailNorm.includes('@')) {
+            return NextResponse.json({ success: false, message: 'Invalid email' }, { status: 400 });
         }
 
         console.log('[Verify] Checking payment for:', orderNumber);
