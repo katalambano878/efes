@@ -205,6 +205,76 @@ export async function POST(req: Request) {
                 }, { status: 400 });
             }
 
+            // Re-verify with Moolre status API (same pattern as Hubtel RMSC check)
+            const externalRefToCheck =
+                String(rawExternalRef || merchantOrderRef) ||
+                merchantOrderRef;
+            try {
+                if (
+                    process.env.MOOLRE_API_USER &&
+                    process.env.MOOLRE_API_PUBKEY &&
+                    process.env.MOOLRE_ACCOUNT_NUMBER
+                ) {
+                    const statusRes = await fetch('https://api.moolre.com/open/transact/status', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-API-USER': process.env.MOOLRE_API_USER,
+                            'X-API-PUBKEY': process.env.MOOLRE_API_PUBKEY,
+                            'X-API-KEY': process.env.MOOLRE_API_PUBKEY,
+                        },
+                        body: JSON.stringify({
+                            type: 1,
+                            idtype: '1',
+                            id: externalRefToCheck,
+                            accountnumber: process.env.MOOLRE_ACCOUNT_NUMBER,
+                        }),
+                    });
+                    const statusJson: any = await statusRes.json().catch(() => ({}));
+                    const sData = statusJson.data || {};
+                    const sTx = sData.txstatus ?? sData.txtstatus;
+                    const sOk =
+                        statusJson.status === 1 &&
+                        (sTx === 1 || sTx === '1');
+                    const sAmount =
+                        sData.amount != null ? parseFloat(String(sData.amount)) : null;
+                    console.log(
+                        '[Callback] Moolre status re-check:',
+                        statusJson.message,
+                        '| txstatus:',
+                        sTx,
+                        '| amount:',
+                        sAmount,
+                    );
+                    if (!sOk) {
+                        await finalizePaymentCallbackEvent(eventId, 'failed', 'Not confirmed by gateway');
+                        return NextResponse.json(
+                            { success: false, message: 'Payment not confirmed by gateway' },
+                            { status: 400 },
+                        );
+                    }
+                    if (
+                        sAmount != null &&
+                        Number.isFinite(sAmount) &&
+                        Math.abs(sAmount - expectedAmount) > 0.01
+                    ) {
+                        await finalizePaymentCallbackEvent(eventId, 'failed', 'Amount mismatch');
+                        return NextResponse.json(
+                            { success: false, message: 'Payment amount does not match order total' },
+                            { status: 400 },
+                        );
+                    }
+                }
+            } catch (recheckErr: any) {
+                console.warn('[Callback] Status re-check failed:', recheckErr?.message || recheckErr);
+                // Fail closed — do not mark paid without gateway confirmation
+                await finalizePaymentCallbackEvent(eventId, 'failed', 'Status re-check failed');
+                return NextResponse.json(
+                    { success: false, message: 'Payment not confirmed by gateway' },
+                    { status: 400 },
+                );
+            }
+
             // Mark order as paid via RPC
             const { data: orderJson, error: updateError } = await supabaseAdmin
                 .rpc('mark_order_paid', {
