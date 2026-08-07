@@ -72,20 +72,22 @@ export async function POST(req: Request) {
         console.log('[Callback] Data keys:', body.data ? Object.keys(body.data).join(', ') : 'no data object');
 
         // ============================================================
+        // EXTRACT FIELDS - Moolre nests payment data inside body.data
+        // ============================================================
+        const data = body.data || {};
+
+        // ============================================================
         // SECURITY: Require callback secret when configured
+        // Live callbacks put `secret` inside data (and sometimes top-level).
         // ============================================================
         const expectedSecret = process.env.MOOLRE_CALLBACK_SECRET;
+        const providedSecret = body.secret ?? data.secret ?? body.data?.secret;
         if (expectedSecret) {
-            if (!body.secret || body.secret !== expectedSecret) {
+            if (!providedSecret || String(providedSecret) !== expectedSecret) {
                 console.error('[Callback] Missing or invalid secret — rejecting.');
                 return NextResponse.json({ success: false, message: 'Invalid secret' }, { status: 403 });
             }
         }
-
-        // ============================================================
-        // EXTRACT FIELDS - Moolre nests payment data inside body.data
-        // ============================================================
-        const data = body.data || {};
 
         // Order reference: check body.data.externalref first, then top-level fallbacks
         const rawExternalRef =
@@ -134,7 +136,9 @@ export async function POST(req: Request) {
             gatewayReference: String(moolreReference),
             orderNumber: merchantOrderRef,
             payload: { status: body.status, data, ts: body.ts },
-            signatureStatus: expectedSecret ? (body.secret === expectedSecret ? 'valid' : 'invalid') : 'unchecked',
+            signatureStatus: expectedSecret
+                ? (String(providedSecret || '') === expectedSecret ? 'valid' : 'invalid')
+                : 'unchecked',
             amountReported: Number.isFinite(callbackAmountEarly as number) ? (callbackAmountEarly as number) : null,
         });
         if (duplicate) {
