@@ -54,8 +54,12 @@ export default function AboutPage() {
           <div className="lg:col-span-5 lg:col-start-2 order-2 lg:order-1 relative">
             <AnimatedSection animation="fade-right">
               <div className="aspect-[4/5] overflow-hidden rounded-t-full shadow-2xl relative isolate bg-gray-100">
-                <img src="/Whisk_yego2igz1ujy2immtujz4gtl2ito00inhldntug.webp" alt="" className="w-full h-full object-cover filter contrast-125" />
-                <div className="absolute inset-0 bg-gradient-to-tr from-gray-900/60 to-transparent z-10"></div>
+                <img
+                  src="/founder.webp"
+                  alt="Founder of Efes Closet"
+                  className="w-full h-full object-cover object-[center_20%]"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-gray-900/50 via-transparent to-transparent z-10"></div>
                 <div className="absolute bottom-10 left-1/2 -translate-x-1/2 z-20 text-center w-full">
                   <span className="bg-white/90 backdrop-blur-md text-gray-900 text-xs font-bold uppercase tracking-[0.2em] px-6 py-3 rounded-full shadow-lg">Our Founder</span>
                 </div>
