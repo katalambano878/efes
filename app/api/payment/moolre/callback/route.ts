@@ -80,11 +80,19 @@ export async function POST(req: Request) {
         // SECURITY: Require callback secret when configured
         // Live callbacks put `secret` inside data (and sometimes top-level).
         // ============================================================
-        const expectedSecret = process.env.MOOLRE_CALLBACK_SECRET;
-        const providedSecret = body.secret ?? data.secret ?? body.data?.secret;
+        const expectedSecret = (process.env.MOOLRE_CALLBACK_SECRET || '').trim();
+        const providedSecret = String(
+            body.secret ?? data.secret ?? data?.metadata?.secret ?? '',
+        ).trim();
         if (expectedSecret) {
-            if (!providedSecret || String(providedSecret) !== expectedSecret) {
-                console.error('[Callback] Missing or invalid secret — rejecting.');
+            if (!providedSecret || providedSecret !== expectedSecret) {
+                console.error(
+                    '[Callback] Missing or invalid secret — rejecting.',
+                    'provided=',
+                    providedSecret ? `${providedSecret.slice(0, 4)}… len=${providedSecret.length}` : 'none',
+                    'expected_len=',
+                    expectedSecret.length,
+                );
                 return NextResponse.json({ success: false, message: 'Invalid secret' }, { status: 403 });
             }
         }
