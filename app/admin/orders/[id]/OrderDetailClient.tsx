@@ -17,6 +17,23 @@ interface FraudAnalysis {
   reasons: string[];
 }
 
+function formatDeliveryMethod(method?: string | null): string {
+  const m = String(method || '').trim().toLowerCase();
+  if (m === 'pickup') return 'Store Pickup';
+  if (m === 'doorstep') return 'Doorstep Delivery';
+  if (m === 'accra') return 'Accra Delivery';
+  if (m === 'outside-accra') return 'Outside Accra Delivery';
+  if (!m) return 'Not specified';
+  return String(method);
+}
+
+function deliveryMethodBadgeClass(method?: string | null): string {
+  const m = String(method || '').trim().toLowerCase();
+  if (m === 'pickup') return 'bg-blue-50 text-blue-800 border-blue-200';
+  if (m === 'doorstep') return 'bg-amber-50 text-amber-900 border-amber-200';
+  return 'bg-gray-50 text-gray-800 border-gray-200';
+}
+
 export default function OrderDetailClient({ orderId }: OrderDetailClientProps) {
   const [order, setOrder] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -340,7 +357,7 @@ export default function OrderDetailClient({ orderId }: OrderDetailClientProps) {
           {/* Order Summary */}
           <div className="flex justify-between mb-6">
             <div>
-              <p><span className="font-semibold">Shipping Method:</span> {order?.shipping_method || 'Standard'}</p>
+              <p><span className="font-semibold">Delivery / Pickup:</span> {formatDeliveryMethod(order?.shipping_method)}</p>
               <p><span className="font-semibold">Payment:</span> {order?.payment_method} ({order?.payment_status})</p>
               {trackingNumber && <p><span className="font-semibold">Tracking #:</span> {trackingNumber}</p>}
             </div>
@@ -538,6 +555,32 @@ export default function OrderDetailClient({ orderId }: OrderDetailClientProps) {
                   <p className="text-sm text-gray-600">{shippingAddress.phone || order.phone}</p>
                 </div>
               </div>
+            </div>
+
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+              <h2 className="text-lg font-bold text-gray-900 mb-4">Delivery / Pickup</h2>
+              <div
+                className={`inline-flex items-center gap-2 px-3 py-2 rounded-lg border text-sm font-semibold ${deliveryMethodBadgeClass(order.shipping_method)}`}
+              >
+                <i
+                  className={`${
+                    String(order.shipping_method || '').toLowerCase() === 'pickup'
+                      ? 'ri-store-2-line'
+                      : 'ri-truck-line'
+                  } text-lg`}
+                />
+                <span>{formatDeliveryMethod(order.shipping_method)}</span>
+              </div>
+              {String(order.shipping_method || '').toLowerCase() === 'doorstep' && (
+                <p className="text-sm text-gray-600 mt-3">
+                  Customer chose doorstep delivery — confirm delivery cost with them before dispatch.
+                </p>
+              )}
+              {String(order.shipping_method || '').toLowerCase() === 'pickup' && (
+                <p className="text-sm text-gray-600 mt-3">
+                  Customer will pick up in store (Dansoman Sahara bus stop).
+                </p>
+              )}
             </div>
 
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">

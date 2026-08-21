@@ -542,6 +542,7 @@ export default function AdminOrdersPage() {
                 <th className="text-left py-4 px-4 text-sm font-semibold text-gray-700">Items</th>
                 <th className="text-left py-4 px-4 text-sm font-semibold text-gray-700">Total</th>
                 <th className="text-left py-4 px-4 text-sm font-semibold text-gray-700">Payment</th>
+                <th className="text-left py-4 px-4 text-sm font-semibold text-gray-700">Delivery</th>
                 <th className="text-left py-4 px-4 text-sm font-semibold text-gray-700">Status</th>
                 <th className="text-left py-4 px-4 text-sm font-semibold text-gray-700">Actions</th>
               </tr>
@@ -549,14 +550,14 @@ export default function AdminOrdersPage() {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={9} className="py-12 text-center text-gray-500">
+                  <td colSpan={10} className="py-12 text-center text-gray-500">
                     <i className="ri-loader-4-line animate-spin text-3xl text-gray-900"></i>
                     <p className="mt-2">Loading orders...</p>
                   </td>
                 </tr>
               ) : filteredOrders.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="py-12 text-center text-gray-500">
+                  <td colSpan={10} className="py-12 text-center text-gray-500">
                     <i className="ri-inbox-line text-4xl text-gray-300"></i>
                     <p className="mt-2">No orders found</p>
                     <p className="text-sm">Orders will appear here when customers place them</p>
@@ -601,6 +602,23 @@ export default function AdminOrdersPage() {
                           </span>
                         )}
                       </div>
+                    </td>
+                    <td className="py-4 px-4 text-sm whitespace-nowrap">
+                      <span
+                        className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold border ${
+                          String(order.shipping_method || '').toLowerCase() === 'pickup'
+                            ? 'bg-blue-50 text-blue-800 border-blue-200'
+                            : String(order.shipping_method || '').toLowerCase() === 'doorstep'
+                              ? 'bg-amber-50 text-amber-900 border-amber-200'
+                              : 'bg-gray-50 text-gray-700 border-gray-200'
+                        }`}
+                      >
+                        {String(order.shipping_method || '').toLowerCase() === 'pickup'
+                          ? 'Pickup'
+                          : String(order.shipping_method || '').toLowerCase() === 'doorstep'
+                            ? 'Doorstep'
+                            : order.shipping_method || '—'}
+                      </span>
                     </td>
                     <td className="py-4 px-4">
                       <span className={`px-3 py-1 rounded-full text-xs font-semibold border whitespace-nowrap ${statusColors[order.status] || 'bg-gray-100 text-gray-700 border-gray-200'}`}>
